@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from Hail_Mary.edge import capture as capture_module
 from Hail_Mary.edge.aggregator import aggregate_window
 from Hail_Mary.edge.buffer import LocalBuffer
+from Hail_Mary.edge.calibrate import load_polygon
 from Hail_Mary.edge.capture import stream_frames
 from Hail_Mary.edge.uplink import Uplink
 from Hail_Mary.vision.detect import boxes_from_result, extract_person_detections, load_model
@@ -37,6 +38,12 @@ def build_capture_args(backend="opencv", camera_source=0, pipeline="jetson_csi",
         backend=backend, source=camera_source, pipeline=pipeline,
         pipeline_str=pipeline_str, width=width, height=height, fps=fps,
     )
+
+
+def resolve_zone(zone_id, zone_polygon, zone_file):
+    if zone_file is None:
+        return zone_id, zone_polygon
+    return load_polygon(zone_file)
 
 
 class WindowAccumulator:
@@ -79,11 +86,13 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     fps=30,
     zone_id=DEFAULT_ZONE_ID,
     zone_polygon=DEFAULT_ZONE_POLYGON,
+    zone_file=None,
     endpoint_url=DEFAULT_ENDPOINT_URL,
     db_path=DEFAULT_DB_PATH,
     window_seconds=60,
     upload_interval_seconds=60,
 ):
+    zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
     cap = capture_module.open_capture(build_capture_args(
         backend=backend, camera_source=camera_source, pipeline=pipeline,
@@ -134,6 +143,7 @@ def _parse_args():  # pragma: no cover -- thin argparse wiring, exercised manual
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--zone-id", default=DEFAULT_ZONE_ID)
+    parser.add_argument("--zone-file", default=None, help="JSON polygon from calibrate.py, overrides --zone-id/defaults")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT_URL)
     parser.add_argument("--db-path", default=DEFAULT_DB_PATH)
     parser.add_argument("--window-seconds", type=int, default=60)
@@ -146,6 +156,6 @@ if __name__ == "__main__":  # pragma: no cover
     run(
         backend=_args.backend, camera_source=_args.source, pipeline=_args.pipeline,
         pipeline_str=_args.pipeline_str, width=_args.width, height=_args.height, fps=_args.fps,
-        zone_id=_args.zone_id, endpoint_url=_args.endpoint, db_path=_args.db_path,
+        zone_id=_args.zone_id, zone_file=_args.zone_file, endpoint_url=_args.endpoint, db_path=_args.db_path,
         window_seconds=_args.window_seconds, upload_interval_seconds=_args.upload_interval_seconds,
     )
