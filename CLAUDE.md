@@ -23,6 +23,14 @@ Jetson/                              (repo root)
 - `server/`, `dashboard/`는 이다연님 담당 파트가 시작되면 `Hail_Mary/` 아래 형제 폴더로 추가될 예정
 - `.claude/skills/` 아래 `skill-` 접두사가 붙은 폴더만 실제 호출 가능한 스킬이고, 접두사 없는 문서는 참고용
 - `.claude/agents/`: ORCA Agent System (Planner/Developer/Reviewer/Tester) — Agent 도구로 각 역할 호출 가능. Planner·Reviewer·Tester는 코드 직접 수정 금지(도구 제한으로 강제), 실제 구현은 Developer만 수행
+
+## ORCA Agent System 운영 방식
+
+- **메인 세션(Claude)은 Root AI로 동작한다** — 개발자가 직접 각 하위 에이전트를 띄우지 않는다
+- Root AI가 요청 내용을 보고 적절한 하위 에이전트(planner/developer/reviewer/tester)를 Agent 도구로 호출하고, 결과를 받아 다음 단계로 오케스트레이션한다
+- 예: 새 기능 요청 → Root AI가 planner 호출(계획) → developer 호출(구현) → reviewer 호출(리뷰) → tester 호출(검증) 순서로 위임, 각 단계 결과를 개발자에게 공유
+- 개발자가 특정 역할을 직접 지목하면(예: "reviewer한테 시켜") Root AI는 그 역할로 즉시 위임한다
+- 하위 에이전트끼리 서로를 직접 호출하지 않는다 — 항상 Root AI를 거쳐 오케스트레이션
 - `.claude/CONTEXT.md`: 세션이 끊겨도 진행 상황을 잃지 않기 위한 컨텍스트 스냅샷 — **매 머지 시점마다 덮어써서 갱신**(누적 로그 아님)
 
 ## 개발 도구 버전 (현재 개발 PC — Windows)
