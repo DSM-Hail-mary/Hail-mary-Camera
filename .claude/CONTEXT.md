@@ -26,6 +26,7 @@
 - M1(캡처)·M2(zone 집계)·M3(로컬버퍼·업링크) 전부 완료. **더불어 M1-인식(YOLOv8n+ByteTrack, 원래 이다연님 파트)도 염세현님이 선제적으로 프로토타입 완성** — 실제 웹캠으로 사람 감지·추적 확인됨(2026-09-08)
 - **통합 오케스트레이션(`Hail_Mary/edge/pipeline.py`) 작성 완료** — capture→vision.detect(YOLOv8n)→aggregator→buffer→uplink를 `run()`으로 연결, 1분 윈도우 판정/집계 로직(`WindowAccumulator`)은 순수함수로 분리해 테스트함(모킹 없음, 실제 aggregate_window 재사용)
 - Jetson 실기기가 아직 없어 `pipeline.run()`의 라이브 루프(실제 카메라+모델+네트워크)는 노트북에서 미실행 — 사용자가 내일(2026-09-09) Jetson 실기기를 가져올 예정, 그때 `--backend gstreamer`로 전환해서 실행
+- `pipeline.py`에 `capture.py`와 동일한 CLI 백엔드 스위치(`--backend`, `--pipeline` 등) 추가 완료 — `build_capture_args()`가 `capture.open_capture()`를 재사용(중복 구현 없음). 이제 `python -m Hail_Mary.edge.pipeline --backend gstreamer --pipeline jetson_csi ...`로 Jetson에서 바로 실행 가능
 - 서버 엔드포인트(`DEFAULT_ENDPOINT_URL`)는 아직 실제 서버가 없어 업로드 시도 시 실패하는 게 정상 — buffer에 그대로 pending으로 남아 다음 주기에 재시도(설계대로 동작)
 - 서버 `/api/v1/occupancy` 실제 스키마 미확정 — `build_occupancy_payload()`에 격리해둠, 이다연님 실제 엔드포인트 나오면 그 함수만 수정
 - capture.py를 실제 프레임 소비하는 곳(이다연의 AI 인식 모듈)과 언제/어떻게 연결할지 인터페이스 합의 필요(해상도 640x384 vs 1280x720)
@@ -46,7 +47,8 @@
 - 이 커밋으로 M1+M2+M3 전체 edge 테스트 스위트 30개, 커버리지 100%
 - `Hail_Mary/vision/` 신규(원래 이다연님 담당, 염세현님이 선제 프로토타입): `detect.py`(`extract_person_detections` — YOLO 출력을 M1→M2 계약 스키마로 변환, 순수함수 테스트 4개 100%), `preview.py`(실시간 웹캠+YOLOv8n+ByteTrack 미리보기, `python -m Hail_Mary.vision.preview`로 실행). `ultralytics==8.4.142`, `torch==2.14.0` 설치 및 버전 고정(`vision/requirements.txt`)
 - 실제 웹캠으로 라이브 검증 완료: 사람 감지·트래킹 정상 동작(모킹 없음, 실제 모델+실제 카메라)
-- Hail_Mary 전체(edge+vision) 테스트 39개, 커버리지 100% (pipeline.py 추가 후)
+- Hail_Mary 전체(edge+vision) 테스트 43개, 커버리지 100% (pipeline.py 백엔드 스위치 추가 후)
+- `문서/제안서_백엔드추가.md` 4.2절 대시보드 항목에 "예측 입력값 구성을 화면에 캡션으로 명시" 보강
 
 ## 최근 노출 이력 (보안)
 - GitHub PAT(`ghp_...`)가 채팅에 평문 노출됨 → 폐기 권장함 (폐기 여부 미확인)

@@ -8,12 +8,14 @@ part is exercised manually (real camera/model/network), same as
 capture.py/preview.py's main().
 """
 
+import argparse
 import time
 from datetime import datetime, timezone
 
+from Hail_Mary.edge import capture as capture_module
 from Hail_Mary.edge.aggregator import aggregate_window
 from Hail_Mary.edge.buffer import LocalBuffer
-from Hail_Mary.edge.capture import open_source, stream_frames
+from Hail_Mary.edge.capture import stream_frames
 from Hail_Mary.edge.uplink import Uplink
 from Hail_Mary.vision.detect import boxes_from_result, extract_person_detections, load_model
 
@@ -25,6 +27,16 @@ DEFAULT_DB_PATH = "occupancy.db"
 
 def _iso(epoch_seconds):
     return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def build_capture_args(backend="opencv", camera_source=0, pipeline="jetson_csi",
+                        pipeline_str=None, width=1280, height=720, fps=30):
+    """Same shape capture.open_capture() expects -- reused here instead of
+    re-implementing the opencv/gstreamer backend switch."""
+    return argparse.Namespace(
+        backend=backend, source=camera_source, pipeline=pipeline,
+        pipeline_str=pipeline_str, width=width, height=height, fps=fps,
+    )
 
 
 class WindowAccumulator:
@@ -58,7 +70,13 @@ class WindowAccumulator:
 
 
 def run(  # pragma: no cover -- live loop needs real camera/model/network
+    backend="opencv",
     camera_source=0,
+    pipeline="jetson_csi",
+    pipeline_str=None,
+    width=1280,
+    height=720,
+    fps=30,
     zone_id=DEFAULT_ZONE_ID,
     zone_polygon=DEFAULT_ZONE_POLYGON,
     endpoint_url=DEFAULT_ENDPOINT_URL,
@@ -67,9 +85,12 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     upload_interval_seconds=60,
 ):
     model = load_model("yolov8n.pt")
-    cap = open_source(backend="opencv", source=camera_source, width=1280, height=720)
+    cap = capture_module.open_capture(build_capture_args(
+        backend=backend, camera_source=camera_source, pipeline=pipeline,
+        pipeline_str=pipeline_str, width=width, height=height, fps=fps,
+    ))
     if not cap.isOpened():
-        raise SystemExit("Failed to open camera")
+        raise SystemExit(f"Failed to open capture (backend={backend})")
 
     buf = LocalBuffer(db_path)
     uplink = Uplink(endpoint_url)
@@ -103,5 +124,28 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
         cap.release()
 
 
+def _parse_args():  # pragma: no cover -- thin argparse wiring, exercised manually
+    parser = argparse.ArgumentParser(description="Hail-Mary edge pipeline (capture -> detect -> M2 -> M3)")
+    parser.add_argument("--backend", choices=["opencv", "gstreamer"], default="opencv")
+    parser.add_argument("--source", type=int, default=0, help="camera index for opencv backend")
+    parser.add_argument("--pipeline", choices=list(capture_module.PIPELINES), default="jetson_csi")
+    parser.add_argument("--pipeline-str", default=None, help="override with a raw GStreamer pipeline")
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--zone-id", default=DEFAULT_ZONE_ID)
+    parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT_URL)
+    parser.add_argument("--db-path", default=DEFAULT_DB_PATH)
+    parser.add_argument("--window-seconds", type=int, default=60)
+    parser.add_argument("--upload-interval-seconds", type=int, default=60)
+    return parser.parse_args()
+
+
 if __name__ == "__main__":  # pragma: no cover
-    run()
+    _args = _parse_args()
+    run(
+        backend=_args.backend, camera_source=_args.source, pipeline=_args.pipeline,
+        pipeline_str=_args.pipeline_str, width=_args.width, height=_args.height, fps=_args.fps,
+        zone_id=_args.zone_id, endpoint_url=_args.endpoint, db_path=_args.db_path,
+        window_seconds=_args.window_seconds, upload_interval_seconds=_args.upload_interval_seconds,
+    )
