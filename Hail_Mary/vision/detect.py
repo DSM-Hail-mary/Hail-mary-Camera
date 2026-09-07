@@ -1,0 +1,42 @@
+"""Person detection (M1-recognition half).
+
+Wraps YOLOv8n (+ built-in ByteTrack via ultralytics' .track()) and converts its
+output into the M1->M2 contract: {frame_ts, detections: [{track_id, bbox, conf}]}.
+extract_person_detections() is pure and testable without loading a real model;
+load_model()/boxes_from_result() are the thin adapter around the actual model.
+"""
+
+PERSON_CLASS_ID = 0  # COCO class index for "person"
+
+
+def extract_person_detections(frame_ts, boxes):
+    detections = [
+        {
+            "track_id": int(box["track_id"]),
+            "bbox": [float(v) for v in box["xyxy"]],
+            "conf": float(box["conf"]),
+        }
+        for box in boxes
+        if box["cls"] == PERSON_CLASS_ID and box["track_id"] is not None
+    ]
+    return {"frame_ts": frame_ts, "detections": detections}
+
+
+def load_model(weights="yolov8n.pt"):  # pragma: no cover -- downloads/loads a real model file
+    from ultralytics import YOLO
+    return YOLO(weights)
+
+
+def boxes_from_result(result):  # pragma: no cover -- depends on real ultralytics Results objects
+    boxes = result.boxes
+    if boxes is None or boxes.id is None:
+        return []
+    return [
+        {
+            "cls": int(boxes.cls[i]),
+            "conf": float(boxes.conf[i]),
+            "xyxy": tuple(boxes.xyxy[i].tolist()),
+            "track_id": int(boxes.id[i]),
+        }
+        for i in range(len(boxes))
+    ]

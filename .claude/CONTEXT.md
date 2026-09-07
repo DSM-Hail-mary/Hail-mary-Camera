@@ -23,7 +23,8 @@
 ## 아직 안 된 것 / 다음에 챙길 것
 - Jetson JetPack 플래싱 (내일 예정 — `skill-jetson-flash-checklist` 참고)
 - 로컬 브랜치가 아직 `master` — 브랜치 전략(`main` 기준)과 이름이 다름, 정리 필요할 수 있음
-- M1(캡처)·M2(zone 집계)·M3(로컬버퍼·업링크) 전부 완료 — 다음은 `run_edge.py`(통합 오케스트레이션) 또는 이다연님과 인터페이스(해상도, 서버 스키마) 확정
+- M1(캡처)·M2(zone 집계)·M3(로컬버퍼·업링크) 전부 완료. **더불어 M1-인식(YOLOv8n+ByteTrack, 원래 이다연님 파트)도 염세현님이 선제적으로 프로토타입 완성** — 실제 웹캠으로 사람 감지·추적 확인됨(2026-09-08)
+- 다음은 `run_edge.py`(capture→vision.detect→aggregator→buffer→uplink 통합) 또는 이다연님과 인터페이스(해상도, 서버 스키마) 확정. 이제 detector가 실제로 존재하므로 임시 대체 없이 바로 통합 가능
 - 서버 `/api/v1/occupancy` 실제 스키마 미확정 — `build_occupancy_payload()`에 격리해둠, 이다연님 실제 엔드포인트 나오면 그 함수만 수정
 - capture.py를 실제 프레임 소비하는 곳(이다연의 AI 인식 모듈)과 언제/어떻게 연결할지 인터페이스 합의 필요(해상도 640x384 vs 1280x720)
 - 이번에 만든 `.claude/agents/*.md`(ORCA 역할)가 이번 세션에서 인식 안 됨 — 세션 재시작 후 재확인 필요
@@ -41,6 +42,9 @@
 - Hail-Mary 로고 방향 3개(Focus Ring 추천/Bolt Monogram/Signal Pulse)를 Claude Design 캔버스로 만들어 게시: https://claude.ai/code/artifact/595d043f-8b8f-4b87-a968-6206303e3e56 (사용자 소유, 편집 가능)
 - `Hail_Mary/edge/uplink.py` 신규(M3): `Uplink.upload_batch()`(HTTP 배치 POST, 지수 백오프 재시도), `build_occupancy_payload()`(서버 스키마 미확정이라 이 함수 하나로 격리). 테스트 6개, 실제 로컬 HTTP 서버(성공/실패/커넥션에러/재시도-후-성공)로 검증, 모킹 없음, 커버리지 100%
 - 이 커밋으로 M1+M2+M3 전체 edge 테스트 스위트 30개, 커버리지 100%
+- `Hail_Mary/vision/` 신규(원래 이다연님 담당, 염세현님이 선제 프로토타입): `detect.py`(`extract_person_detections` — YOLO 출력을 M1→M2 계약 스키마로 변환, 순수함수 테스트 4개 100%), `preview.py`(실시간 웹캠+YOLOv8n+ByteTrack 미리보기, `python -m Hail_Mary.vision.preview`로 실행). `ultralytics==8.4.142`, `torch==2.14.0` 설치 및 버전 고정(`vision/requirements.txt`)
+- 실제 웹캠으로 라이브 검증 완료: 사람 감지·트래킹 정상 동작(모킹 없음, 실제 모델+실제 카메라)
+- Hail_Mary 전체(edge+vision) 테스트 35개, 커버리지 100%
 
 ## 최근 노출 이력 (보안)
 - GitHub PAT(`ghp_...`)가 채팅에 평문 노출됨 → 폐기 권장함 (폐기 여부 미확인)
