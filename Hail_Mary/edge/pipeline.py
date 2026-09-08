@@ -46,6 +46,12 @@ def resolve_zone(zone_id, zone_polygon, zone_file):
     return load_polygon(zone_file)
 
 
+def due(last_time, now, interval_seconds):
+    """True once interval_seconds have passed since last_time -- shared trigger
+    logic for both the periodic upload and the periodic buffer purge."""
+    return (now - last_time) >= interval_seconds
+
+
 class WindowAccumulator:
     def __init__(self, zone_id, zone_polygon, window_seconds=60):
         self.zone_id = zone_id
@@ -91,6 +97,8 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     db_path=DEFAULT_DB_PATH,
     window_seconds=60,
     upload_interval_seconds=60,
+    purge_interval_seconds=3600,
+    retain_days=7,
     min_conf=DEFAULT_MIN_CONF,
 ):
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
@@ -106,6 +114,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     uplink = Uplink(endpoint_url)
     window = WindowAccumulator(zone_id, zone_polygon, window_seconds)
     last_upload = time.time()
+    last_purge = time.time()
 
     try:
         for frame in stream_frames(cap):
@@ -120,7 +129,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
                 buf.insert(record)
                 print(f"window closed: zone={record['zone_id']} count={record['count']}", flush=True)
 
-            if now - last_upload >= upload_interval_seconds:
+            if due(last_upload, now, upload_interval_seconds):
                 pending = buf.fetch_pending(limit=100)
                 if pending:
                     result = uplink.upload_batch(pending)
@@ -130,6 +139,11 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
                     else:
                         print("upload failed, will retry next cycle", flush=True)
                 last_upload = now
+
+            if due(last_purge, now, purge_interval_seconds):
+                buf.purge_older_than(retain_days)
+                print(f"purged records older than {retain_days} days", flush=True)
+                last_purge = now
     finally:
         cap.release()
 
@@ -149,6 +163,8 @@ def _parse_args():  # pragma: no cover -- thin argparse wiring, exercised manual
     parser.add_argument("--db-path", default=DEFAULT_DB_PATH)
     parser.add_argument("--window-seconds", type=int, default=60)
     parser.add_argument("--upload-interval-seconds", type=int, default=60)
+    parser.add_argument("--purge-interval-seconds", type=int, default=3600)
+    parser.add_argument("--retain-days", type=int, default=7)
     parser.add_argument("--min-conf", type=float, default=DEFAULT_MIN_CONF)
     return parser.parse_args()
 
@@ -160,5 +176,6 @@ if __name__ == "__main__":  # pragma: no cover
         pipeline_str=_args.pipeline_str, width=_args.width, height=_args.height, fps=_args.fps,
         zone_id=_args.zone_id, zone_file=_args.zone_file, endpoint_url=_args.endpoint, db_path=_args.db_path,
         window_seconds=_args.window_seconds, upload_interval_seconds=_args.upload_interval_seconds,
+        purge_interval_seconds=_args.purge_interval_seconds, retain_days=_args.retain_days,
         min_conf=_args.min_conf,
     )

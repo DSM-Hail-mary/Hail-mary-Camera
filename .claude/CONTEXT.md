@@ -33,6 +33,8 @@
 - **`Hail_Mary/edge/accuracy.py` 신규**: 제안서.md 8.1절 KPI(오차 ±1명 이내 또는 정확도 90%↑, 4.5절: 20~30회 샘플링) 그대로 구현한 정확도 검증 도구. `AccuracyLog`(record/mae/within_tolerance_rate/meets_kpi/save_csv)는 순수 로직으로 테스트됨(20+ 샘플 미만이면 KPI 충족 주장 자체를 막음). `main()`은 카메라 앞에서 `a` 키로 실측값 직접 입력하며 시스템 카운트와 대조하는 대화형 도구 — 실제 Jetson·카메라로 검증할 때 사용
 - 이 검증 도구는 개발계획서 2장 "4.5절 검증 분담: 점유율 감지 정확도(카메라 앞 실측 대조)"가 염세현님 공식 담당 항목이라 만들어둔 것 — 나중에 4주차 M4 마일스톤(KPI 수치 확정)에 바로 씀
 - `vision/detect.py`에 `min_conf` 필터링 추가(`DEFAULT_MIN_CONF=0.5`) — 낮은 confidence 오탐 배제. `pipeline.py`(`--min-conf`)·`accuracy.py`·`preview.py` 전부 같은 기본값 공유(검증 도구가 실제 배포와 다른 임계값 쓰면 KPI 측정이 무의미해지므로 일부러 상수 하나로 통일)
+- **`pipeline.py`에 `due()` 순수 함수 추가**(마지막 실행 이후 interval 경과했는지 판정) — 기존 업로드 주기 체크를 이걸로 통일하고, 새로 **buffer 자동 purge**(`--purge-interval-seconds` 기본 3600초, `--retain-days` 기본 7일) 주기 로직 연결. `buffer.py`의 `purge_older_than()`은 이미 테스트돼있어서 새 테스트는 `due()` 3개만 추가
+- **알려진 이슈**: `vision/preview.py` 라이브 실행 시 바운딩박스가 안 그려짐(`people=0`) — 사용자가 확인 중, `--min-conf` 낮춰서 재시도 요청함, 원인 미확정(조명/각도 vs 실제 버그)
 - 서버 엔드포인트(`DEFAULT_ENDPOINT_URL`)는 아직 실제 서버가 없어 업로드 시도 시 실패하는 게 정상 — buffer에 그대로 pending으로 남아 다음 주기에 재시도(설계대로 동작)
 - 서버 `/api/v1/occupancy` 실제 스키마 미확정 — `build_occupancy_payload()`에 격리해둠, 이다연님 실제 엔드포인트 나오면 그 함수만 수정
 - capture.py를 실제 프레임 소비하는 곳(이다연의 AI 인식 모듈)과 언제/어떻게 연결할지 인터페이스 합의 필요(해상도 640x384 vs 1280x720)
@@ -53,7 +55,8 @@
 - 이 커밋으로 M1+M2+M3 전체 edge 테스트 스위트 30개, 커버리지 100%
 - `Hail_Mary/vision/` 신규(원래 이다연님 담당, 염세현님이 선제 프로토타입): `detect.py`(`extract_person_detections` — YOLO 출력을 M1→M2 계약 스키마로 변환, 순수함수 테스트 4개 100%), `preview.py`(실시간 웹캠+YOLOv8n+ByteTrack 미리보기, `python -m Hail_Mary.vision.preview`로 실행). `ultralytics==8.4.142`, `torch==2.14.0` 설치 및 버전 고정(`vision/requirements.txt`)
 - 실제 웹캠으로 라이브 검증 완료: 사람 감지·트래킹 정상 동작(모킹 없음, 실제 모델+실제 카메라)
-- Hail_Mary 전체(edge+vision) 테스트 60개, 커버리지 100% (min_conf 필터링 추가 후)
+- Hail_Mary edge+vision 테스트 63개, 커버리지 100% (buffer 자동 purge 연결 후)
+- 백엔드(M4~M11, `Hail_Mary/server/`)는 별도 백그라운드 에이전트가 구현 중 — 완료되면 이 CONTEXT.md에 별도로 정리 예정, 커밋/푸시는 검토 후 진행
 - `문서/제안서_백엔드추가.md` 4.2절 대시보드 항목에 "예측 입력값 구성을 화면에 캡션으로 명시" 보강
 
 ## 최근 노출 이력 (보안)

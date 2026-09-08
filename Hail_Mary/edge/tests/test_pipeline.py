@@ -1,4 +1,4 @@
-from Hail_Mary.edge.pipeline import WindowAccumulator
+from Hail_Mary.edge.pipeline import WindowAccumulator, due
 
 SQUARE_ZONE = [(0, 0), (100, 0), (100, 100), (0, 100)]
 
@@ -53,3 +53,15 @@ def test_close_with_no_frames_returns_zero_count():
     record = window.close(now=1060.0)
 
     assert record["count"] == 0
+
+
+def test_due_false_before_interval_elapsed():
+    assert due(last_time=1000.0, now=1030.0, interval_seconds=60) is False
+
+
+def test_due_true_once_interval_elapsed():
+    assert due(last_time=1000.0, now=1060.0, interval_seconds=60) is True
+
+
+def test_due_true_past_the_interval():
+    assert due(last_time=1000.0, now=2000.0, interval_seconds=60) is True
