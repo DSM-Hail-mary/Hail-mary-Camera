@@ -30,6 +30,8 @@
 - **`Hail_Mary/edge/calibrate.py` 신규**: 마우스 클릭으로 zone 폴리곤을 지정하고 JSON으로 저장하는 캘리브레이션 도구. `save_polygon()`/`load_polygon()`은 순수 파일 I/O로 테스트됨(실제 임시 파일), `main()`(실제 클릭 루프)은 수동 검증 대상
 - `pipeline.py`에 `resolve_zone()` + `--zone-file` CLI 옵션 추가 — calibrate.py가 만든 JSON을 바로 읽어서 zone_id/폴리곤으로 사용 가능 (캘리브레이션 도구와 파이프라인이 실제로 연결됨)
 - **사용자 수동 검증 필요**: `python -m Hail_Mary.edge.calibrate`로 실제 웹캠 켜서 클릭으로 zone 잡고 `s`로 저장 → `python -m Hail_Mary.edge.pipeline --zone-file zone.json ...`으로 그 zone이 실제 반영되는지 확인 (아직 라이브로 안 돌려봄)
+- **`Hail_Mary/edge/accuracy.py` 신규**: 제안서.md 8.1절 KPI(오차 ±1명 이내 또는 정확도 90%↑, 4.5절: 20~30회 샘플링) 그대로 구현한 정확도 검증 도구. `AccuracyLog`(record/mae/within_tolerance_rate/meets_kpi/save_csv)는 순수 로직으로 테스트됨(20+ 샘플 미만이면 KPI 충족 주장 자체를 막음). `main()`은 카메라 앞에서 `a` 키로 실측값 직접 입력하며 시스템 카운트와 대조하는 대화형 도구 — 실제 Jetson·카메라로 검증할 때 사용
+- 이 검증 도구는 개발계획서 2장 "4.5절 검증 분담: 점유율 감지 정확도(카메라 앞 실측 대조)"가 염세현님 공식 담당 항목이라 만들어둔 것 — 나중에 4주차 M4 마일스톤(KPI 수치 확정)에 바로 씀
 - 서버 엔드포인트(`DEFAULT_ENDPOINT_URL`)는 아직 실제 서버가 없어 업로드 시도 시 실패하는 게 정상 — buffer에 그대로 pending으로 남아 다음 주기에 재시도(설계대로 동작)
 - 서버 `/api/v1/occupancy` 실제 스키마 미확정 — `build_occupancy_payload()`에 격리해둠, 이다연님 실제 엔드포인트 나오면 그 함수만 수정
 - capture.py를 실제 프레임 소비하는 곳(이다연의 AI 인식 모듈)과 언제/어떻게 연결할지 인터페이스 합의 필요(해상도 640x384 vs 1280x720)
@@ -50,7 +52,7 @@
 - 이 커밋으로 M1+M2+M3 전체 edge 테스트 스위트 30개, 커버리지 100%
 - `Hail_Mary/vision/` 신규(원래 이다연님 담당, 염세현님이 선제 프로토타입): `detect.py`(`extract_person_detections` — YOLO 출력을 M1→M2 계약 스키마로 변환, 순수함수 테스트 4개 100%), `preview.py`(실시간 웹캠+YOLOv8n+ByteTrack 미리보기, `python -m Hail_Mary.vision.preview`로 실행). `ultralytics==8.4.142`, `torch==2.14.0` 설치 및 버전 고정(`vision/requirements.txt`)
 - 실제 웹캠으로 라이브 검증 완료: 사람 감지·트래킹 정상 동작(모킹 없음, 실제 모델+실제 카메라)
-- Hail_Mary 전체(edge+vision) 테스트 48개, 커버리지 100% (calibrate.py + zone-file 연동 추가 후)
+- Hail_Mary 전체(edge+vision) 테스트 58개, 커버리지 100% (accuracy.py 추가 후)
 - `문서/제안서_백엔드추가.md` 4.2절 대시보드 항목에 "예측 입력값 구성을 화면에 캡션으로 명시" 보강
 
 ## 최근 노출 이력 (보안)
