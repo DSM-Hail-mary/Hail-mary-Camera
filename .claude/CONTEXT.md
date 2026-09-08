@@ -56,7 +56,14 @@
 - `Hail_Mary/vision/` 신규(원래 이다연님 담당, 염세현님이 선제 프로토타입): `detect.py`(`extract_person_detections` — YOLO 출력을 M1→M2 계약 스키마로 변환, 순수함수 테스트 4개 100%), `preview.py`(실시간 웹캠+YOLOv8n+ByteTrack 미리보기, `python -m Hail_Mary.vision.preview`로 실행). `ultralytics==8.4.142`, `torch==2.14.0` 설치 및 버전 고정(`vision/requirements.txt`)
 - 실제 웹캠으로 라이브 검증 완료: 사람 감지·트래킹 정상 동작(모킹 없음, 실제 모델+실제 카메라)
 - Hail_Mary edge+vision 테스트 63개, 커버리지 100% (buffer 자동 purge 연결 후)
-- 백엔드(M4~M11, `Hail_Mary/server/`)는 별도 백그라운드 에이전트가 구현 중 — 완료되면 이 CONTEXT.md에 별도로 정리 예정, 커밋/푸시는 검토 후 진행
+- **백엔드(M4~M11, `Hail_Mary/server/`) 구현 완료** — 별도 에이전트가 구현, 직접 검증 완료:
+  - FastAPI 앱, DB 5테이블, `/api/v1/occupancy`(POST/live), `/forecast`, `/forecast/ablation`, `/anomaly` API
+  - Feature Store, Forecast Engine(**실제 Amazon Chronos-2**, HuggingFace에서 456MB 가중치 실제 다운로드 확인됨), Ablation Evaluator, Anomaly Detector, Notification Service(WebPush, 가짜 성공처리 없음— 코드 직접 리뷰함)
+  - 데이터: **실제 BDG2**(Building Data Genome Project 2) 다운로드, Panther 사이트 사무용 건물 3개, 2017년 8760시간 실측치, `Hail_Mary/server/data/raw/bdg2/SOURCE.txt`에 출처 문서화
+  - 테스트 73개, 커버리지 99% (직접 재실행해서 확인함)
+  - **실제 통합 테스트 수행**: uvicorn으로 서버 띄우고 `uplink.py`(모킹 없이 실제 코드)로 POST → 성공, `/live` 조회로 확인. `pipeline.py --endpoint http://127.0.0.1:8000/...`로 전체 라이브 루프도 실제 서버에 정상 업로드됨
+  - 오늘 DoD("서버 DB에 쌓인다") 요구사항이 코드 레벨에서는 실제로 충족 가능함을 확인함
+  - M8(절감량 계산), M10 WebSocket, M11 대시보드는 이번 범위에 의도적으로 미포함(오버엔지니어링 방지, 지시 범위 내)
 - `문서/제안서_백엔드추가.md` 4.2절 대시보드 항목에 "예측 입력값 구성을 화면에 캡션으로 명시" 보강
 
 ## 최근 노출 이력 (보안)
