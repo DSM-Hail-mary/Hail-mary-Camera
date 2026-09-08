@@ -45,3 +45,23 @@ def test_extract_person_detections_returns_empty_list_for_no_boxes():
     result = extract_person_detections("2026-09-08T09:00:00Z", [])
 
     assert result == {"frame_ts": "2026-09-08T09:00:00Z", "detections": []}
+
+
+def test_extract_person_detections_drops_boxes_below_min_conf():
+    boxes = [
+        _box(cls=PERSON_CLASS_ID, conf=0.9, xyxy=(10, 10, 30, 30), track_id=1),
+        _box(cls=PERSON_CLASS_ID, conf=0.4, xyxy=(50, 50, 90, 90), track_id=2),
+    ]
+
+    result = extract_person_detections("2026-09-08T09:00:00Z", boxes, min_conf=0.5)
+
+    assert len(result["detections"]) == 1
+    assert result["detections"][0]["track_id"] == 1
+
+
+def test_extract_person_detections_default_min_conf_keeps_typical_yolo_confidences():
+    boxes = [_box(cls=PERSON_CLASS_ID, conf=0.3, xyxy=(10, 10, 30, 30), track_id=1)]
+
+    result = extract_person_detections("2026-09-08T09:00:00Z", boxes)
+
+    assert len(result["detections"]) == 1

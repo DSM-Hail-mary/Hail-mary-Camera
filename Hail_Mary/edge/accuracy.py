@@ -71,12 +71,17 @@ class AccuracyLog:
 
 
 def main(zone_id="hall_main", zone_polygon=None, out_path="accuracy.csv",
-         camera_source=0):  # pragma: no cover -- live loop needs real camera/model/tester
+         camera_source=0, min_conf=None):  # pragma: no cover -- live loop needs real camera/model/tester
     import cv2
 
     from Hail_Mary.edge.capture import open_source, stream_frames
     from Hail_Mary.edge.zones import count_people_in_zone
-    from Hail_Mary.vision.detect import boxes_from_result, extract_person_detections, load_model
+    from Hail_Mary.vision.detect import (
+        DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model,
+    )
+
+    if min_conf is None:
+        min_conf = DEFAULT_MIN_CONF
 
     if zone_polygon is None:
         zone_polygon = [(0, 0), (1280, 0), (1280, 720), (0, 720)]
@@ -94,7 +99,7 @@ def main(zone_id="hall_main", zone_polygon=None, out_path="accuracy.csv",
         for frame in stream_frames(cap):
             result = model.track(frame, persist=True, verbose=False, classes=[0])[0]
             boxes = boxes_from_result(result)
-            detections = extract_person_detections(0, boxes)["detections"]
+            detections = extract_person_detections(0, boxes, min_conf=min_conf)["detections"]
             detected_count = count_people_in_zone(detections, zone_polygon)
 
             cv2.putText(frame, f"system count: {detected_count}", (10, 30),

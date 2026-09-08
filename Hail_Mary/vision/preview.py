@@ -11,7 +11,7 @@ import time
 import cv2
 
 from Hail_Mary.edge.capture import open_source, stream_frames
-from Hail_Mary.vision.detect import boxes_from_result, extract_person_detections, load_model
+from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 WINDOW_NAME = "Hail-Mary YOLOv8n preview"
 
@@ -31,7 +31,7 @@ def main():  # pragma: no cover -- interactive CLI loop, needs real camera/displ
             frame_i += 1
             result = model.track(frame, persist=True, verbose=False, classes=[0])[0]
             boxes = boxes_from_result(result)
-            detections = extract_person_detections(time.time(), boxes)["detections"]
+            detections = extract_person_detections(time.time(), boxes, min_conf=DEFAULT_MIN_CONF)["detections"]
 
             for det in detections:
                 x1, y1, x2, y2 = (int(v) for v in det["bbox"])

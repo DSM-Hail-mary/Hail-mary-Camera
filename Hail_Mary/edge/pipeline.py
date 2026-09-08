@@ -18,7 +18,7 @@ from Hail_Mary.edge.buffer import LocalBuffer
 from Hail_Mary.edge.calibrate import load_polygon
 from Hail_Mary.edge.capture import stream_frames
 from Hail_Mary.edge.uplink import Uplink
-from Hail_Mary.vision.detect import boxes_from_result, extract_person_detections, load_model
+from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 DEFAULT_ZONE_ID = "hall_main"
 DEFAULT_ZONE_POLYGON = [(0, 0), (1280, 0), (1280, 720), (0, 720)]
@@ -91,6 +91,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     db_path=DEFAULT_DB_PATH,
     window_seconds=60,
     upload_interval_seconds=60,
+    min_conf=DEFAULT_MIN_CONF,
 ):
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
@@ -111,7 +112,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
             now = time.time()
             result = model.track(frame, persist=True, verbose=False, classes=[0])[0]
             boxes = boxes_from_result(result)
-            detections = extract_person_detections(now, boxes)["detections"]
+            detections = extract_person_detections(now, boxes, min_conf=min_conf)["detections"]
             window.add_frame(now, detections, now)
 
             if window.ready(now):
@@ -148,6 +149,7 @@ def _parse_args():  # pragma: no cover -- thin argparse wiring, exercised manual
     parser.add_argument("--db-path", default=DEFAULT_DB_PATH)
     parser.add_argument("--window-seconds", type=int, default=60)
     parser.add_argument("--upload-interval-seconds", type=int, default=60)
+    parser.add_argument("--min-conf", type=float, default=DEFAULT_MIN_CONF)
     return parser.parse_args()
 
 
@@ -158,4 +160,5 @@ if __name__ == "__main__":  # pragma: no cover
         pipeline_str=_args.pipeline_str, width=_args.width, height=_args.height, fps=_args.fps,
         zone_id=_args.zone_id, zone_file=_args.zone_file, endpoint_url=_args.endpoint, db_path=_args.db_path,
         window_seconds=_args.window_seconds, upload_interval_seconds=_args.upload_interval_seconds,
+        min_conf=_args.min_conf,
     )

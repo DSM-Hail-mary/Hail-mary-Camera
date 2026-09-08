@@ -7,9 +7,10 @@ load_model()/boxes_from_result() are the thin adapter around the actual model.
 """
 
 PERSON_CLASS_ID = 0  # COCO class index for "person"
+DEFAULT_MIN_CONF = 0.5  # applied consistently across pipeline.py/accuracy.py/preview.py
 
 
-def extract_person_detections(frame_ts, boxes):
+def extract_person_detections(frame_ts, boxes, min_conf=0.0):
     detections = [
         {
             "track_id": int(box["track_id"]),
@@ -17,7 +18,7 @@ def extract_person_detections(frame_ts, boxes):
             "conf": float(box["conf"]),
         }
         for box in boxes
-        if box["cls"] == PERSON_CLASS_ID and box["track_id"] is not None
+        if box["cls"] == PERSON_CLASS_ID and box["track_id"] is not None and box["conf"] >= min_conf
     ]
     return {"frame_ts": frame_ts, "detections": detections}
 
