@@ -2,69 +2,72 @@
 
 > 이 파일은 매 머지(merge) 시점마다 **덮어써서** 최신 상태만 남긴다 (누적 로그 아님). 목적: 세션이 끊겨도 지금까지 결정된 것/진행 상황을 놓치지 않기 위함.
 
-**최종 갱신**: 2026-09-07 (CLAUDE.md 커밋 `221781b` 직후)
+**최종 갱신**: 2026-09-09
 
-## 담당자 (이 리포 기준)
-- 염세현: HW·카메라·엣지 파이프라인 (M1 캡처, M2 zone, M3 로컬버퍼·업링크), 케이스 제작, 현장 캘리브레이션
-- 이다연: AI 모델(YOLOv8n/Chronos-2)·백엔드+프런트(경량)·문서
+## 저장소 구조 (2개로 분리됨)
 
-## 지금까지 확정된 것
-- 저장소 구조: `문서/`(기획), `Hail_Mary/edge/`(엣지 코드), `.claude/skills/`(프로젝트 전용 스킬)
-- `Hail_Mary/edge/capture.py`: OpenCV(Windows 개발용)/GStreamer(Jetson용) 백엔드 스위치 가능한 카메라 캡처 스크립트, X버튼/`q` 둘 다 종료 처리 완료
-- 개발 규칙(CLAUDE.md): 모킹 금지, 테스트 커버리지 90%, TDD(Red-Green-Refactor), 패키지 버전 고정, 컴포넌트 네이밍 명확화
-- 커밋 메시지: 설명 없이 구현 내용만 최대 7글자
-- 브랜치 전략: `main` → `feature/*` → 하위 브랜치, 하위→상위 feature→main 순으로 머지
-- GitHub 원격 리포 후보: `https://github.com/DSM-Hail-mary/Hail-mary-Camera.git` (확인 시점 기준 커밋 0개, 아직 origin 연결 안 함)
-- `.claude/agents/`: ORCA Agent System 4종(planner/developer/reviewer/tester) 정의 완료 — Planner/Reviewer/Tester는 도구 제한으로 코드 수정 불가, Developer만 구현
-- `CLAUDE.md`가 로컬 master에 커밋됨(`50178fb` 규칙정리 → `221781b` 에이전트추가, Root AI 오케스트레이션 원칙 포함). `.claude/`, `Hail_Mary/`, `문서/`는 아직 미커밋 상태
-- GitHub `Hail-mary-Camera` 리포에 push 완료 — origin 연결(`https://github.com/DSM-Hail-mary/Hail-mary-Camera.git`) 후 `master` → `origin/master`로 push, 트래킹 설정됨(`gh auth login`으로 `ilfpns` 계정 인증)
-- 브랜치명이 아직 `master` — 브랜치 전략 문서(`main` 기준)와 이름이 다름, `main`으로 정리 필요 여부 확인 대기 중
+| 리포 | 로컬 경로 | 내용 |
+|---|---|---|
+| `Hail-mary-Camera` | `D:\orca_jetson\Jetson` | 엣지(Jetson) 코드 — `Hail_Mary/edge/`, `Hail_Mary/vision/`, 기획 문서(`문서/`, 로컬 전용) |
+| `Hail-mary-Server` | `D:\orca_jetson\Hail-mary-Server` | 백엔드(FastAPI) + 대시보드 — `Hail_Mary/server/`, `Hail_Mary/dashboard/` |
 
-## 아직 안 된 것 / 다음에 챙길 것
-- Jetson JetPack 플래싱 (내일 예정 — `skill-jetson-flash-checklist` 참고)
-- 로컬 브랜치가 아직 `master` — 브랜치 전략(`main` 기준)과 이름이 다름, 정리 필요할 수 있음
-- M1(캡처)·M2(zone 집계)·M3(로컬버퍼·업링크) 전부 완료. **더불어 M1-인식(YOLOv8n+ByteTrack, 원래 이다연님 파트)도 염세현님이 선제적으로 프로토타입 완성** — 실제 웹캠으로 사람 감지·추적 확인됨(2026-09-08)
-- **통합 오케스트레이션(`Hail_Mary/edge/pipeline.py`) 작성 완료** — capture→vision.detect(YOLOv8n)→aggregator→buffer→uplink를 `run()`으로 연결, 1분 윈도우 판정/집계 로직(`WindowAccumulator`)은 순수함수로 분리해 테스트함(모킹 없음, 실제 aggregate_window 재사용)
-- Jetson 실기기가 아직 없어 `pipeline.run()`의 라이브 루프(실제 카메라+모델+네트워크)는 노트북에서 미실행 — 사용자가 내일(2026-09-09) Jetson 실기기를 가져올 예정, 그때 `--backend gstreamer`로 전환해서 실행
-- `pipeline.py`에 `capture.py`와 동일한 CLI 백엔드 스위치(`--backend`, `--pipeline` 등) 추가 완료 — `build_capture_args()`가 `capture.open_capture()`를 재사용(중복 구현 없음). 이제 `python -m Hail_Mary.edge.pipeline --backend gstreamer --pipeline jetson_csi ...`로 Jetson에서 바로 실행 가능
-- **`Hail_Mary/edge/calibrate.py` 신규**: 마우스 클릭으로 zone 폴리곤을 지정하고 JSON으로 저장하는 캘리브레이션 도구. `save_polygon()`/`load_polygon()`은 순수 파일 I/O로 테스트됨(실제 임시 파일), `main()`(실제 클릭 루프)은 수동 검증 대상
-- `pipeline.py`에 `resolve_zone()` + `--zone-file` CLI 옵션 추가 — calibrate.py가 만든 JSON을 바로 읽어서 zone_id/폴리곤으로 사용 가능 (캘리브레이션 도구와 파이프라인이 실제로 연결됨)
-- **사용자 수동 검증 필요**: `python -m Hail_Mary.edge.calibrate`로 실제 웹캠 켜서 클릭으로 zone 잡고 `s`로 저장 → `python -m Hail_Mary.edge.pipeline --zone-file zone.json ...`으로 그 zone이 실제 반영되는지 확인 (아직 라이브로 안 돌려봄)
-- **`Hail_Mary/edge/accuracy.py` 신규**: 제안서.md 8.1절 KPI(오차 ±1명 이내 또는 정확도 90%↑, 4.5절: 20~30회 샘플링) 그대로 구현한 정확도 검증 도구. `AccuracyLog`(record/mae/within_tolerance_rate/meets_kpi/save_csv)는 순수 로직으로 테스트됨(20+ 샘플 미만이면 KPI 충족 주장 자체를 막음). `main()`은 카메라 앞에서 `a` 키로 실측값 직접 입력하며 시스템 카운트와 대조하는 대화형 도구 — 실제 Jetson·카메라로 검증할 때 사용
-- 이 검증 도구는 개발계획서 2장 "4.5절 검증 분담: 점유율 감지 정확도(카메라 앞 실측 대조)"가 염세현님 공식 담당 항목이라 만들어둔 것 — 나중에 4주차 M4 마일스톤(KPI 수치 확정)에 바로 씀
-- `vision/detect.py`에 `min_conf` 필터링 추가(`DEFAULT_MIN_CONF=0.5`) — 낮은 confidence 오탐 배제. `pipeline.py`(`--min-conf`)·`accuracy.py`·`preview.py` 전부 같은 기본값 공유(검증 도구가 실제 배포와 다른 임계값 쓰면 KPI 측정이 무의미해지므로 일부러 상수 하나로 통일)
-- **`pipeline.py`에 `due()` 순수 함수 추가**(마지막 실행 이후 interval 경과했는지 판정) — 기존 업로드 주기 체크를 이걸로 통일하고, 새로 **buffer 자동 purge**(`--purge-interval-seconds` 기본 3600초, `--retain-days` 기본 7일) 주기 로직 연결. `buffer.py`의 `purge_older_than()`은 이미 테스트돼있어서 새 테스트는 `due()` 3개만 추가
-- **알려진 이슈**: `vision/preview.py` 라이브 실행 시 바운딩박스가 안 그려짐(`people=0`) — 사용자가 확인 중, `--min-conf` 낮춰서 재시도 요청함, 원인 미확정(조명/각도 vs 실제 버그)
-- 서버 엔드포인트(`DEFAULT_ENDPOINT_URL`)는 아직 실제 서버가 없어 업로드 시도 시 실패하는 게 정상 — buffer에 그대로 pending으로 남아 다음 주기에 재시도(설계대로 동작)
-- 서버 `/api/v1/occupancy` 실제 스키마 미확정 — `build_occupancy_payload()`에 격리해둠, 이다연님 실제 엔드포인트 나오면 그 함수만 수정
-- capture.py를 실제 프레임 소비하는 곳(이다연의 AI 인식 모듈)과 언제/어떻게 연결할지 인터페이스 합의 필요(해상도 640x384 vs 1280x720)
-- 이번에 만든 `.claude/agents/*.md`(ORCA 역할)가 이번 세션에서 인식 안 됨 — 세션 재시작 후 재확인 필요
+- GitHub 계정: `ilfpns` (gh CLI 인증됨), 조직: `DSM-Hail-mary`
+- 두 리포 모두 `CLAUDE.md`는 **로컬 전용**(`.gitignore`에 추가, git 추적 안 함) — 사용자 요청
+- Camera 리포의 `문서/`(제안서·기능명세서·개발계획서 등)도 **로컬 전용으로 결정**(2026-09-09) — 한 번 커밋했다가 사용자 요청으로 되돌리고 `.gitignore`에 `문서/` 추가함(`CLAUDE.md`와 동일 패턴)
+- 두 리포 다 브랜치는 `main`(Camera는 원래 `master`였다가 유지 중 — 아직 rename 안 함, 우선순위 낮음). 이번 세션 작업은 전부 `master`에 직접 커밋(별도 feature 브랜치 안 씀 — 브랜치 전략 문서와 실제 관행이 다른 상태가 계속됨)
+- Camera 리포 커밋 규칙: 영어, 설명 없이 최대 7글자 (예: `add tdd`, `add m3`). Server 리포도 동일 규칙 사용 중
 
-## 최근 완료된 작업 (2026-09-07, 미커밋)
-- `Hail_Mary/edge/capture.py` 리팩터: `open_source()`(카메라/영상 소스 활성화, opencv+gstreamer 백엔드, 카메라 인덱스뿐 아니라 파일 경로도 허용)와 `stream_frames()`(연속 프레임 스트리밍 제너레이터)를 재사용 가능한 함수로 분리 — CLI(`main()`)도 이 함수들을 사용하도록 변경
-- TDD Red→Green으로 진행: `Hail_Mary/edge/tests/test_capture.py` 7개 테스트, 실제 비디오 파일(cv2.VideoWriter로 생성)로 검증(모킹 없음)
-- `capture.py` 커버리지 100% 달성 (`main()`의 인터랙티브 루프만 `# pragma: no cover`로 명시적 제외 — 실제 카메라/디스플레이 필요해서 skill-capture-check로 수동 검증)
-- pytest==9.1.1, pytest-cov==7.1.0 설치 및 `Hail_Mary/edge/requirements-dev.txt`에 버전 고정
-- 실제 웹캠으로 리팩터 후 정상 동작 재확인(--no-preview --duration 3, ~30fps)
-- `Hail_Mary/edge/zones.py` 신규(M2 일부): `bbox_center`, `point_in_zone`(ray-casting), `count_people_in_zone` — 순수 좌표 계산, AI/이미지 처리 없음. TDD Red→Green, 테스트 7개 통과, 커버리지 100%
-- `Hail_Mary/edge/aggregator.py` 신규(M2): `aggregate_window()` — 윈도우 마지막 프레임 스냅샷 방식으로 count 산출. 테스트 4개, 커버리지 100%
-- `Hail_Mary/edge/buffer.py` 신규(M3): `LocalBuffer`(SQLite insert/fetch_pending/fetch_all/mark_uploaded/purge_older_than). 테스트 6개, 커버리지 100%
-- 전체 edge 테스트 스위트 24개 전부 통과, 전체 커버리지 100% (`capture.py`의 인터랙티브 `main()`만 pragma 제외)
-- Hail-Mary 로고 방향 3개(Focus Ring 추천/Bolt Monogram/Signal Pulse)를 Claude Design 캔버스로 만들어 게시: https://claude.ai/code/artifact/595d043f-8b8f-4b87-a968-6206303e3e56 (사용자 소유, 편집 가능)
-- `Hail_Mary/edge/uplink.py` 신규(M3): `Uplink.upload_batch()`(HTTP 배치 POST, 지수 백오프 재시도), `build_occupancy_payload()`(서버 스키마 미확정이라 이 함수 하나로 격리). 테스트 6개, 실제 로컬 HTTP 서버(성공/실패/커넥션에러/재시도-후-성공)로 검증, 모킹 없음, 커버리지 100%
-- 이 커밋으로 M1+M2+M3 전체 edge 테스트 스위트 30개, 커버리지 100%
-- `Hail_Mary/vision/` 신규(원래 이다연님 담당, 염세현님이 선제 프로토타입): `detect.py`(`extract_person_detections` — YOLO 출력을 M1→M2 계약 스키마로 변환, 순수함수 테스트 4개 100%), `preview.py`(실시간 웹캠+YOLOv8n+ByteTrack 미리보기, `python -m Hail_Mary.vision.preview`로 실행). `ultralytics==8.4.142`, `torch==2.14.0` 설치 및 버전 고정(`vision/requirements.txt`)
-- 실제 웹캠으로 라이브 검증 완료: 사람 감지·트래킹 정상 동작(모킹 없음, 실제 모델+실제 카메라)
-- Hail_Mary edge+vision 테스트 63개, 커버리지 100% (buffer 자동 purge 연결 후)
-- **백엔드(M4~M11, `Hail_Mary/server/`) 구현 완료** — 별도 에이전트가 구현, 직접 검증 완료:
-  - FastAPI 앱, DB 5테이블, `/api/v1/occupancy`(POST/live), `/forecast`, `/forecast/ablation`, `/anomaly` API
-  - Feature Store, Forecast Engine(**실제 Amazon Chronos-2**, HuggingFace에서 456MB 가중치 실제 다운로드 확인됨), Ablation Evaluator, Anomaly Detector, Notification Service(WebPush, 가짜 성공처리 없음— 코드 직접 리뷰함)
-  - 데이터: **실제 BDG2**(Building Data Genome Project 2) 다운로드, Panther 사이트 사무용 건물 3개, 2017년 8760시간 실측치, `Hail_Mary/server/data/raw/bdg2/SOURCE.txt`에 출처 문서화
-  - 테스트 73개, 커버리지 99% (직접 재실행해서 확인함)
-  - **실제 통합 테스트 수행**: uvicorn으로 서버 띄우고 `uplink.py`(모킹 없이 실제 코드)로 POST → 성공, `/live` 조회로 확인. `pipeline.py --endpoint http://127.0.0.1:8000/...`로 전체 라이브 루프도 실제 서버에 정상 업로드됨
-  - 오늘 DoD("서버 DB에 쌓인다") 요구사항이 코드 레벨에서는 실제로 충족 가능함을 확인함
-  - M8(절감량 계산), M10 WebSocket, M11 대시보드는 이번 범위에 의도적으로 미포함(오버엔지니어링 방지, 지시 범위 내)
-- `문서/제안서_백엔드추가.md` 4.2절 대시보드 항목에 "예측 입력값 구성을 화면에 캡션으로 명시" 보강
+## 담당자
+- 염세현(사용자): HW·카메라·엣지 파이프라인 담당이지만, 이다연 파트(AI 인식, 백엔드 전체)까지 선제적으로 다 구현함
+- 이다연: 원래 AI 모델(YOLOv8n/Chronos-2)·백엔드+프런트·문서 담당 — 아직 실제로 작업 시작했는지는 불명, 염세현이 대신 구현한 상태
 
-## 최근 노출 이력 (보안)
-- GitHub PAT(`ghp_...`)가 채팅에 평문 노출됨 → 폐기 권장함 (폐기 여부 미확인)
+## 완료된 것 — Camera 리포 (Hail_Mary/edge/, Hail_Mary/vision/)
+
+- **M1 캡처** (`capture.py`): OpenCV/GStreamer 백엔드 스위치, `open_source()`+`stream_frames()`
+- **M1 인식** (`vision/detect.py`, `preview.py`): YOLOv8n+ByteTrack, 실제 웹캠 검증됨(사람 감지·카운트 정상)
+- **M2** (`zones.py`, `aggregator.py`): zone 폴리곤 판정 + 1분 윈도우 집계
+- **M3** (`buffer.py`, `uplink.py`): SQLite 로컬버퍼(자동 purge 포함) + HTTP 배치 업로드(재시도)
+- **통합** (`pipeline.py`): capture→detect→M2→M3 오케스트레이션, CLI로 backend/zone-file/min-conf/iou/purge 전부 조절 가능
+- **`calibrate.py`**: 마우스 클릭으로 zone 폴리곤 지정·저장
+- **`accuracy.py`**: 제안서.md 8.1절 KPI(오차 ±1명 이내 또는 정확도 90%↑, 20~30 샘플) 검증 도구. `pipeline.py`의 `resolve_zone()`을 재사용해 `--zone-file`/`--min-conf`/`--iou`/`--source` CLI 지원(2026-09-09 추가) — 실제 배포 설정과 동일한 값으로 KPI를 측정할 수 있게 함
+- **`edge/systemd/`**(2026-09-09 신규): `hail-mary-pipeline.service` — Jetson 재부팅/크래시 시 파이프라인 자동 재시작(`Restart=on-failure`). 기능명세서 비기능요구사항("가용성") 항목 충족. User/WorkingDirectory 등은 placeholder, 실제 systemctl 검증은 Jetson 실기기에서만 가능(Windows PC엔 systemd 자체가 없어 미검증)
+- **명세서-코드 정렬(2026-09-09)**: 카메라 기본 해상도 1280×720→**640×384**(기능명세서 M1 기준)로 통일, `DEFAULT_IOU=0.5` 신규 추가(기존엔 IoU가 아예 설정 안 됐었음), `DEFAULT_MIN_CONF` 0.5→**0.45**(명세서 0.4와 기존 0.5 사이 절충, 사용자 승인)
+- **타입 힌트**(2026-09-09): edge+vision 전체 프로덕션 모듈에 타입 힌트 추가, `mypy==2.3.1` dev 의존성 추가, 클린 통과
+- 테스트 63개, 커버리지 100%, 전부 모킹 없음(실제 SQLite/HTTP서버/비디오파일/웹캠)
+- Hail-Mary 로고(Claude Design 캔버스): https://claude.ai/code/artifact/595d043f-8b8f-4b87-a968-6206303e3e56
+- `TODO.md`(리포 루트, git 추적됨) — 전체 프로젝트 체크리스트, 최신 상태로 유지 중
+
+## 완료된 것 — Server 리포 (Hail_Mary/server/, Hail_Mary/dashboard/)
+
+전부 별도 background 에이전트로 구현 후 직접 검증(테스트 재실행, 코드 리뷰, 실제 서버 기동+curl/API 확인)하고 커밋함.
+
+- **M4/M5 Forecast Engine**: 실제 Amazon Chronos-2(HuggingFace `amazon/chronos-2`, 456MB) 사용
+- **데이터**: 실제 BDG2(Building Data Genome Project 2), Panther 사이트 사무용 건물 3개, 2017년 8760시간
+- **M6 Ablation Evaluator**, **M7 Anomaly Detector**, **M9 Notification**(WebPush, 가짜 성공처리 없음)
+- **M8 Savings/Carbon Calculator** (`core/savings.py`): 실측 vs 시뮬레이션 kWh 비교 계산 공식만 구현
+- **M10/M11 대시보드** (`Hail_Mary/dashboard/`): 순수 HTML+JS+fetch, REST 폴링(WebSocket 제외), 4개 위젯
+- API: `POST/GET /api/v1/occupancy`(스키마가 Camera의 `uplink.build_occupancy_payload()`와 정확히 일치함을 재확인, 2026-09-09), `GET /api/v1/forecast`, `GET /api/v1/forecast/ablation`, `GET/POST /api/v1/anomaly`, `POST/GET /api/v1/savings`
+- 테스트: 백엔드 92개(커버리지 99%) + 대시보드 순수로직 19개(node:test)
+- **Camera↔Server 실제 연동 검증 완료**: `uplink.py`로 POST 성공, `/live` 조회 확인, `pipeline.py` 전체 라이브 루프도 실서버에 정상 업로드
+- **접근성 검토 아직 안 됨** — 대시보드가 이미 구현됐는데 CLAUDE.md의 "접근성 고려" 규칙은 아직 미적용 상태로 남아있음(2026-09-09 CLAUDE.md 갱신 시 재확인)
+
+## 오늘(2026-09-09) 해결된 핵심 이슈: `preview.py` count=0 버그
+
+- 원인: **코드 결함이 아니었음**. 실제 프레임을 캡처해서 진단한 결과 완전히 새까만 화면(평균 밝기 9/255, YOLO가 사람뿐 아니라 전체 클래스 0개 감지)이었고, `AUTO_EXPOSURE`를 강제로 auto로 바꿔도 3.6초간 변화 없어(8.75→9.22) 노출 설정 문제도 아니었음 → **렌즈 가림/조도 부족**으로 결론
+- 사용자가 렌즈/조명 조정 후 `python -m Hail_Mary.vision.preview` 재검증 → 555프레임 동안 `people=1` 안정적으로 감지됨(640×384 해상도 기준). **완전히 해결됨**
+
+## 아직 안 된 것 (`TODO.md` 참고, Camera 리포 루트) — 전부 Jetson 실기기·실제 데모 장소가 있어야 진행 가능
+
+- **Jetson 실기기 세팅(JetPack 플래싱)조차 아직 실제로 안 함** — 계속 미뤄지는 중, 1주차 마일스톤(9/9 DoD: "Jetson이 실시간으로 사람 수를 세고 서버 DB에 1분마다 적재") 기준 미달 상태
+- **Zone 실측 캘리브레이션**: 노트북 웹캠으로 미리 해두는 게 무의미하다고 판단(2026-09-09, 사용자 지적) — zone 좌표는 카메라 설치 위치/각도에 종속적이라 실제 Jetson+데모 장소가 있어야 함. 도구(`calibrate.py`) 자체는 코드 레벨 검증 완료, 실행만 미룸
+- **정확도 KPI 실측**(20~30샘플, `accuracy.py`): 같은 이유로 노트북 웹캠 실측은 KPI로 못 씀. 도구는 CLI까지 완비(위 참고), 실행만 대기
+- 서버 실배포 위치 미정(로컬 127.0.0.1만 검증됨), `uplink.py` 엔드포인트를 실제 서버 주소로 바꿔야 함
+- 케이스(외장) 제작 — 4주차 마감이라 안 급함
+- 대시보드 접근성 검토
+
+## 카메라 SW 사전구현 가능 항목 — 2026-09-09 기준 소진 확인
+
+명세서(개발_기능명세서.md/개발계획서.md) 대 코드 전수 대조를 두 차례 수행(해상도, confidence, IoU, zone config.yaml 여부, M2/M3 필드명, systemd 가용성 요구사항, 문서 스키마 일치 여부, 패키지 버전 고정, 주차별 일정 항목까지). **결론: Jetson 실기기·실제 데모 장소 없이 지금 코드로 더 할 수 있는 Camera SW 작업은 없음.** 다음에 다시 이 질문이 나오면 이 섹션부터 참고할 것 — 새 코드 변경 없이 같은 대조를 반복하지 않도록.
+
+## 보안 노출 이력
+- GitHub PAT(`ghp_...`)가 채팅에 평문 노출된 적 있음 → 폐기 권장함 (폐기 여부 미확인)
