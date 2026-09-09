@@ -99,10 +99,10 @@ def main(
         min_conf = DEFAULT_MIN_CONF
 
     if zone_polygon is None:
-        zone_polygon = [(0, 0), (1280, 0), (1280, 720), (0, 720)]
+        zone_polygon = [(0, 0), (640, 0), (640, 384), (0, 384)]
 
     model = load_model("yolov8n.pt")
-    cap = open_source(backend="opencv", source=camera_source, width=1280, height=720)
+    cap = open_source(backend="opencv", source=camera_source, width=640, height=384)
     if not cap.isOpened():
         raise SystemExit("Failed to open camera")
 
