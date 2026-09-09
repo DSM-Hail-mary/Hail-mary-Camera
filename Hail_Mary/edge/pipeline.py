@@ -25,7 +25,7 @@ from Hail_Mary.edge.zones import Point
 from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 DEFAULT_ZONE_ID = "hall_main"
-DEFAULT_ZONE_POLYGON: list[Point] = [(0, 0), (1280, 0), (1280, 720), (0, 720)]
+DEFAULT_ZONE_POLYGON: list[Point] = [(0, 0), (640, 0), (640, 384), (0, 384)]
 DEFAULT_ENDPOINT_URL = "http://127.0.0.1:8000/api/v1/occupancy"
 DEFAULT_DB_PATH = "occupancy.db"
 
@@ -39,8 +39,8 @@ def build_capture_args(
     camera_source: int | str = 0,
     pipeline: str = "jetson_csi",
     pipeline_str: str | None = None,
-    width: int = 1280,
-    height: int = 720,
+    width: int = 640,
+    height: int = 384,
     fps: int = 30,
 ) -> argparse.Namespace:
     """Same shape capture.open_capture() expects -- reused here instead of
@@ -100,8 +100,8 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     camera_source: int | str = 0,
     pipeline: str = "jetson_csi",
     pipeline_str: str | None = None,
-    width: int = 1280,
-    height: int = 720,
+    width: int = 640,
+    height: int = 384,
     fps: int = 30,
     zone_id: str = DEFAULT_ZONE_ID,
     zone_polygon: Sequence[Point] = DEFAULT_ZONE_POLYGON,
@@ -167,8 +167,8 @@ def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wi
     parser.add_argument("--source", type=int, default=0, help="camera index for opencv backend")
     parser.add_argument("--pipeline", choices=list(capture_module.PIPELINES), default="jetson_csi")
     parser.add_argument("--pipeline-str", default=None, help="override with a raw GStreamer pipeline")
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--width", type=int, default=640)
+    parser.add_argument("--height", type=int, default=384)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--zone-id", default=DEFAULT_ZONE_ID)
     parser.add_argument("--zone-file", default=None, help="JSON polygon from calibrate.py, overrides --zone-id/defaults")

@@ -17,7 +17,8 @@ import numpy as np
 
 PIPELINE_JETSON_CSI = (
     "nvarguscamerasrc sensor-id=0 ! "
-    "video/x-raw(memory:NVMM), width=1280, height=720, framerate=30/1, format=NV12 ! "
+    # placeholder resolution -- adjust to match the actual camera once connected
+    "video/x-raw(memory:NVMM), width=640, height=384, framerate=30/1, format=NV12 ! "
     "nvvidconv flip-method=0 ! "
     "video/x-raw, format=BGRx ! "
     "videoconvert ! "
@@ -26,7 +27,8 @@ PIPELINE_JETSON_CSI = (
 
 PIPELINE_JETSON_USB = (
     "v4l2src device=/dev/video0 ! "
-    "video/x-raw, width=1280, height=720, framerate=30/1 ! "
+    # placeholder resolution -- adjust to match the actual camera once connected
+    "video/x-raw, width=640, height=384, framerate=30/1 ! "
     "videoconvert ! "
     "video/x-raw, format=BGR ! appsink drop=1"
 )
@@ -89,8 +91,8 @@ def main() -> None:  # pragma: no cover -- interactive CLI loop, needs real came
     parser.add_argument("--source", type=int, default=0, help="camera index for opencv backend")
     parser.add_argument("--pipeline", choices=list(PIPELINES), default="jetson_csi")
     parser.add_argument("--pipeline-str", default=None, help="override with a raw GStreamer pipeline")
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--width", type=int, default=640)
+    parser.add_argument("--height", type=int, default=384)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--no-preview", action="store_true", help="skip cv2.imshow, just print FPS")
     parser.add_argument("--duration", type=float, default=0, help="auto-exit after N seconds (0 = run until 'q')")

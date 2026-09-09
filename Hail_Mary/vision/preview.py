@@ -20,7 +20,7 @@ def main() -> None:  # pragma: no cover -- interactive CLI loop, needs real came
     print("loading YOLOv8n...", flush=True)
     model = load_model("yolov8n.pt")
     print("model loaded, opening camera...", flush=True)
-    cap = open_source(backend="opencv", source=0, width=1280, height=720)
+    cap = open_source(backend="opencv", source=0, width=640, height=384)
     if not cap.isOpened():
         raise SystemExit("Failed to open camera")
     print("camera opened, starting loop", flush=True)
