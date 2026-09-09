@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Any
 
 PERSON_CLASS_ID = 0  # COCO class index for "person"
-DEFAULT_MIN_CONF = 0.5  # applied consistently across pipeline.py/accuracy.py/preview.py
+DEFAULT_MIN_CONF = 0.45  # 개발_기능명세서.md M1 기본값(0.4)과 기존 보수값(0.5) 사이 절충, applied consistently across pipeline.py/accuracy.py/preview.py
 DEFAULT_IOU = 0.5  # 개발_기능명세서.md M1: NMS IoU 기본값 0.5, applied consistently across pipeline.py/accuracy.py/preview.py
 
 
