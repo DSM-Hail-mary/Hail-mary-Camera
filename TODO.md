@@ -14,14 +14,16 @@
 - [ ] `PIPELINE_JETSON_CSI`/`PIPELINE_JETSON_USB`의 sensor-id·해상도를 실제 카메라값으로 조정
 - [ ] 실기기에서 YOLOv8n 추론 포함 실측 FPS 측정 (목표 10~15fps)
 
-## Zone 캘리브레이션 (실제 데모 장소 확정 후)
+## Zone 캘리브레이션 (실제 데모 장소 확정 후) — 아직 시작하면 안 됨
 
-- [ ] `python -m Hail_Mary.edge.calibrate`로 실제 zone 폴리곤 클릭·저장
+- ⚠️ **노트북 웹캠으로 미리 해두는 게 무의미함**(2026-09-09 확인) — zone 좌표는 카메라 설치 위치·각도에 종속적이라, Jetson 실기기를 실제 데모 장소에 설치한 뒤 그 카메라로 캘리브레이션해야 실사용 가능한 값이 나옴. 도구 자체(`calibrate.py`)는 동작 검증 완료(코드 레벨), 실행만 미루는 것
+- [ ] Jetson을 실제 데모 장소에 설치한 뒤 `python -m Hail_Mary.edge.calibrate`로 zone 폴리곤 클릭·저장
 - [ ] `pipeline.py --zone-file zone.json`으로 반영 확인
 
-## 정확도 검증 (제안서.md 4.5절/8.1절 KPI — 염세현 공식 담당)
+## 정확도 검증 (제안서.md 4.5절/8.1절 KPI — 염세현 공식 담당) — 아직 시작하면 안 됨
 
-- [ ] `python -m Hail_Mary.edge.accuracy`로 실측 20~30회 샘플링
+- ⚠️ **같은 이유로 노트북 웹캠 실측은 KPI로 못 씀** — 실제 데모 카메라·거리·각도 기준이어야 유효한 수치. `accuracy.py` 자체는 코드 레벨 검증 완료
+- [ ] Jetson+실제 장소 확정 후 `python -m Hail_Mary.edge.accuracy`로 실측 20~30회 샘플링
 - [ ] `meets_kpi` True 확인 (오차 ±1명 이내 또는 정확도 90%↑) — 미달 시 zone/conf 재조정
 
 ## 백엔드 (Hail-mary-Server) — 미구현분
