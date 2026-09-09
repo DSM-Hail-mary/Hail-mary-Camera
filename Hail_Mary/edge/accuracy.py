@@ -11,9 +11,12 @@ import csv
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from Hail_Mary.edge.zones import Point
+
+if TYPE_CHECKING:
+    import argparse
 
 KPI_TOLERANCE = 1
 KPI_MIN_RATE = 0.9
@@ -83,6 +86,7 @@ class AccuracyLog:
 def main(
     zone_id: str = "hall_main",
     zone_polygon: Sequence[Point] | None = None,
+    zone_file: str | Path | None = None,
     out_path: str | Path = "accuracy.csv",
     camera_source: int | str = 0,
     min_conf: float | None = None,
@@ -91,6 +95,7 @@ def main(
     import cv2
 
     from Hail_Mary.edge.capture import open_source, stream_frames
+    from Hail_Mary.edge.pipeline import resolve_zone
     from Hail_Mary.edge.zones import count_people_in_zone
     from Hail_Mary.vision.detect import (
         DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model,
@@ -103,6 +108,9 @@ def main(
 
     if zone_polygon is None:
         zone_polygon = [(0, 0), (640, 0), (640, 384), (0, 384)]
+    # zone_file (from calibrate.py) takes precedence when supplied, so the KPI
+    # run measures the same zone the deployed pipeline.py actually uses.
+    zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
 
     model = load_model("yolov8n.pt")
     cap = open_source(backend="opencv", source=camera_source, width=640, height=384)
@@ -140,5 +148,21 @@ def main(
     print(log.summary(), flush=True)
 
 
+def _parse_args() -> "argparse.Namespace":  # pragma: no cover -- thin argparse wiring, exercised manually
+    import argparse  # noqa: F811 -- runtime re-import, keeps CLI wiring lazy like the rest of this module
+    parser = argparse.ArgumentParser(description="Hail-Mary occupancy accuracy validation (제안서.md 4.5/8.1절 KPI)")
+    parser.add_argument("--zone-id", default="hall_main")
+    parser.add_argument("--zone-file", default=None, help="JSON polygon from calibrate.py, overrides --zone-id/defaults")
+    parser.add_argument("--out", default="accuracy.csv")
+    parser.add_argument("--source", type=int, default=0, help="camera index")
+    parser.add_argument("--min-conf", type=float, default=None, help="defaults to vision.detect.DEFAULT_MIN_CONF")
+    parser.add_argument("--iou", type=float, default=None, help="defaults to vision.detect.DEFAULT_IOU")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":  # pragma: no cover
-    main()
+    _args = _parse_args()
+    main(
+        zone_id=_args.zone_id, zone_file=_args.zone_file, out_path=_args.out,
+        camera_source=_args.source, min_conf=_args.min_conf, iou=_args.iou,
+    )

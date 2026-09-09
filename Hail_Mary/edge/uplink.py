@@ -21,9 +21,9 @@ class UploadResult:
 
 
 def build_occupancy_payload(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Assumed contract (unconfirmed with the server): a JSON array of
-    {zone_id, window_start, window_end, count}. The local-only `id` is
-    stripped before sending."""
+    """Contract confirmed against Hail-mary-Server's api/occupancy.py
+    (OccupancyRecord): a JSON array of {zone_id, window_start, window_end,
+    count}. The local-only `id` is stripped before sending."""
     return [
         {
             "zone_id": record["zone_id"],
