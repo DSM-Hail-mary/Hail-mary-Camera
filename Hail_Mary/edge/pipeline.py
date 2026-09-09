@@ -22,7 +22,7 @@ from Hail_Mary.edge.calibrate import load_polygon
 from Hail_Mary.edge.capture import stream_frames
 from Hail_Mary.edge.uplink import Uplink
 from Hail_Mary.edge.zones import Point
-from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
+from Hail_Mary.vision.detect import DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 DEFAULT_ZONE_ID = "hall_main"
 DEFAULT_ZONE_POLYGON: list[Point] = [(0, 0), (640, 0), (640, 384), (0, 384)]
@@ -113,6 +113,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     purge_interval_seconds: float = 3600,
     retain_days: float = 7,
     min_conf: float = DEFAULT_MIN_CONF,
+    iou: float = DEFAULT_IOU,
 ) -> None:
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
@@ -132,7 +133,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     try:
         for frame in stream_frames(cap):
             now = time.time()
-            result = model.track(frame, persist=True, verbose=False, classes=[0])[0]
+            result = model.track(frame, persist=True, verbose=False, classes=[0], iou=iou)[0]
             boxes = boxes_from_result(result)
             detections = extract_person_detections(now, boxes, min_conf=min_conf)["detections"]
             window.add_frame(now, detections, now)
@@ -179,6 +180,7 @@ def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wi
     parser.add_argument("--purge-interval-seconds", type=int, default=3600)
     parser.add_argument("--retain-days", type=int, default=7)
     parser.add_argument("--min-conf", type=float, default=DEFAULT_MIN_CONF)
+    parser.add_argument("--iou", type=float, default=DEFAULT_IOU)
     return parser.parse_args()
 
 
@@ -190,5 +192,5 @@ if __name__ == "__main__":  # pragma: no cover
         zone_id=_args.zone_id, zone_file=_args.zone_file, endpoint_url=_args.endpoint, db_path=_args.db_path,
         window_seconds=_args.window_seconds, upload_interval_seconds=_args.upload_interval_seconds,
         purge_interval_seconds=_args.purge_interval_seconds, retain_days=_args.retain_days,
-        min_conf=_args.min_conf,
+        min_conf=_args.min_conf, iou=_args.iou,
     )

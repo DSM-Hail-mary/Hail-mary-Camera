@@ -86,17 +86,20 @@ def main(
     out_path: str | Path = "accuracy.csv",
     camera_source: int | str = 0,
     min_conf: float | None = None,
+    iou: float | None = None,
 ) -> None:  # pragma: no cover -- live loop needs real camera/model/tester
     import cv2
 
     from Hail_Mary.edge.capture import open_source, stream_frames
     from Hail_Mary.edge.zones import count_people_in_zone
     from Hail_Mary.vision.detect import (
-        DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model,
+        DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model,
     )
 
     if min_conf is None:
         min_conf = DEFAULT_MIN_CONF
+    if iou is None:
+        iou = DEFAULT_IOU
 
     if zone_polygon is None:
         zone_polygon = [(0, 0), (640, 0), (640, 384), (0, 384)]
@@ -112,7 +115,7 @@ def main(
 
     try:
         for frame in stream_frames(cap):
-            result = model.track(frame, persist=True, verbose=False, classes=[0])[0]
+            result = model.track(frame, persist=True, verbose=False, classes=[0], iou=iou)[0]
             boxes = boxes_from_result(result)
             detections = extract_person_detections(0, boxes, min_conf=min_conf)["detections"]
             detected_count = count_people_in_zone(detections, zone_polygon)
