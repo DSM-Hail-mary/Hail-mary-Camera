@@ -2,72 +2,73 @@
 
 > 이 파일은 매 머지(merge) 시점마다 **덮어써서** 최신 상태만 남긴다 (누적 로그 아님). 목적: 세션이 끊겨도 지금까지 결정된 것/진행 상황을 놓치지 않기 위함.
 
-**최종 갱신**: 2026-09-09
+**최종 갱신**: 2026-09-10
 
-## 저장소 구조 (2개로 분리됨)
+## 저장소 구조 (3개로 분리됨)
 
 | 리포 | 로컬 경로 | 내용 |
 |---|---|---|
 | `Hail-mary-Camera` | `D:\orca_jetson\Jetson` | 엣지(Jetson) 코드 — `Hail_Mary/edge/`, `Hail_Mary/vision/`, 기획 문서(`문서/`, 로컬 전용) |
-| `Hail-mary-Server` | `D:\orca_jetson\Hail-mary-Server` | 백엔드(FastAPI) + 대시보드 — `Hail_Mary/server/`, `Hail_Mary/dashboard/` |
+| `Hail-mary-Server` | `D:\orca_jetson\Hail-mary-Server` | 백엔드(FastAPI) — `Hail_Mary/server/`. **`dashboard/`는 Front 리포로 이전, 이 리포에서는 삭제됨(2026-09-10)** |
+| `Hail-mary-Front` | `D:\orca_jetson\Hail-mary-Front` | **신설(2026-09-10)** — M11 대시보드(순수 HTML/CSS/JS). Server의 `Hail_Mary/dashboard/`를 이전+전면 재설계 |
 
 - GitHub 계정: `ilfpns` (gh CLI 인증됨), 조직: `DSM-Hail-mary`
-- 두 리포 모두 `CLAUDE.md`는 **로컬 전용**(`.gitignore`에 추가, git 추적 안 함) — 사용자 요청
-- Camera 리포의 `문서/`(제안서·기능명세서·개발계획서 등)도 **로컬 전용으로 결정**(2026-09-09) — 한 번 커밋했다가 사용자 요청으로 되돌리고 `.gitignore`에 `문서/` 추가함(`CLAUDE.md`와 동일 패턴)
-- 두 리포 다 브랜치는 `main`(Camera는 원래 `master`였다가 유지 중 — 아직 rename 안 함, 우선순위 낮음). 이번 세션 작업은 전부 `master`에 직접 커밋(별도 feature 브랜치 안 씀 — 브랜치 전략 문서와 실제 관행이 다른 상태가 계속됨)
-- Camera 리포 커밋 규칙: 영어, 설명 없이 최대 7글자 (예: `add tdd`, `add m3`). Server 리포도 동일 규칙 사용 중
+- 세 리포 모두 `CLAUDE.md`는 **로컬 전용**(`.gitignore`에 추가, git 추적 안 함)
+- Camera 리포의 `문서/`(제안서·기능명세서·개발계획서 등)도 로컬 전용
+- 브랜치는 계속 `master`/`main`에 직접 커밋(별도 feature 브랜치 안 씀 — 브랜치 전략 문서와 실제 관행이 다른 상태 유지 중, 우선순위 낮아 방치)
+- 커밋 규칙: 영어, 설명 없이 최대 7글자 (예: `add tdd`, `add m3`). 세 리포 다 동일 규칙
 
 ## 담당자
-- 염세현(사용자): HW·카메라·엣지 파이프라인 담당이지만, 이다연 파트(AI 인식, 백엔드 전체)까지 선제적으로 다 구현함
-- 이다연: 원래 AI 모델(YOLOv8n/Chronos-2)·백엔드+프런트·문서 담당 — 아직 실제로 작업 시작했는지는 불명, 염세현이 대신 구현한 상태
+- 염세현(사용자): HW·카메라·엣지 파이프라인 담당이지만, 이다연 파트(AI 인식, 백엔드, 프론트 초안)까지 선제적으로 다 구현함. 프론트 비주얼 디자인은 디자이너에게 핸드오프(`Hail-mary-Front/기능명세서.md`)
+- 이다연: 원래 AI 모델·백엔드+프런트·문서 담당 — 실제 작업 착수 여부 불명, 염세현이 대신 구현한 상태
 
-## 완료된 것 — Camera 리포 (Hail_Mary/edge/, Hail_Mary/vision/)
+## 완료된 것 — Camera 리포
 
-- **M1 캡처** (`capture.py`): OpenCV/GStreamer 백엔드 스위치, `open_source()`+`stream_frames()`
-- **M1 인식** (`vision/detect.py`, `preview.py`): YOLOv8n+ByteTrack, 실제 웹캠 검증됨(사람 감지·카운트 정상)
-- **M2** (`zones.py`, `aggregator.py`): zone 폴리곤 판정 + 1분 윈도우 집계
-- **M3** (`buffer.py`, `uplink.py`): SQLite 로컬버퍼(자동 purge 포함) + HTTP 배치 업로드(재시도)
-- **통합** (`pipeline.py`): capture→detect→M2→M3 오케스트레이션, CLI로 backend/zone-file/min-conf/iou/purge 전부 조절 가능
-- **`calibrate.py`**: 마우스 클릭으로 zone 폴리곤 지정·저장
-- **`accuracy.py`**: 제안서.md 8.1절 KPI(오차 ±1명 이내 또는 정확도 90%↑, 20~30 샘플) 검증 도구. `pipeline.py`의 `resolve_zone()`을 재사용해 `--zone-file`/`--min-conf`/`--iou`/`--source` CLI 지원(2026-09-09 추가) — 실제 배포 설정과 동일한 값으로 KPI를 측정할 수 있게 함
-- **`edge/systemd/`**(2026-09-09 신규): `hail-mary-pipeline.service` — Jetson 재부팅/크래시 시 파이프라인 자동 재시작(`Restart=on-failure`). 기능명세서 비기능요구사항("가용성") 항목 충족. User/WorkingDirectory 등은 placeholder, 실제 systemctl 검증은 Jetson 실기기에서만 가능(Windows PC엔 systemd 자체가 없어 미검증)
-- **명세서-코드 정렬(2026-09-09)**: 카메라 기본 해상도 1280×720→**640×384**(기능명세서 M1 기준)로 통일, `DEFAULT_IOU=0.5` 신규 추가(기존엔 IoU가 아예 설정 안 됐었음), `DEFAULT_MIN_CONF` 0.5→**0.45**(명세서 0.4와 기존 0.5 사이 절충, 사용자 승인)
-- **타입 힌트**(2026-09-09): edge+vision 전체 프로덕션 모듈에 타입 힌트 추가, `mypy==2.3.1` dev 의존성 추가, 클린 통과
-- 테스트 63개, 커버리지 100%, 전부 모킹 없음(실제 SQLite/HTTP서버/비디오파일/웹캠)
-- Hail-Mary 로고(Claude Design 캔버스): https://claude.ai/code/artifact/595d043f-8b8f-4b87-a968-6206303e3e56
-- `TODO.md`(리포 루트, git 추적됨) — 전체 프로젝트 체크리스트, 최신 상태로 유지 중
+- M1(캡처+인식 YOLOv8n+ByteTrack), M2(zone 집계), M3(로컬버퍼+업링크), 통합 오케스트레이션(`pipeline.py`)
+- `calibrate.py`(zone 지정), `accuracy.py`(KPI 검증, CLI 완비: `--zone-file`/`--min-conf`/`--iou`)
+- 타입 힌트 전체 적용 + mypy 클린, systemd 자동재시작 서비스(`edge/systemd/`)
+- 명세서-코드 정렬: 해상도 640×384, `DEFAULT_IOU=0.5`(신규), `DEFAULT_MIN_CONF=0.45`
+- **"마지막 목격 이미지" 캡처**(2026-09-10): `last_seen.py`(`LastSeenTracker`, zone count>0→0 전환 감지) + `last_seen_uplink.py`(멀티파트 업로드) + `pipeline.py` 통합(매 프레임 체크, 전환 시 JPEG 인코딩→로컬 저장(`last_seen/{zone_id}.jpg`, 덮어쓰기)→서버 업로드). `--last-seen-dir`/`--last-seen-base-url` CLI 옵션
+- 테스트 74개, 커버리지 100%, mypy 클린, 전부 모킹 없음
+- `count=0` 버그였던 것은 실제로는 렌즈/조명 문제였음 — 해결 완료(2026-09-09), 실제 웹캠 재검증됨
 
-## 완료된 것 — Server 리포 (Hail_Mary/server/, Hail_Mary/dashboard/)
+## 완료된 것 — Server 리포
 
-전부 별도 background 에이전트로 구현 후 직접 검증(테스트 재실행, 코드 리뷰, 실제 서버 기동+curl/API 확인)하고 커밋함.
+- M4~M10 API 전체(Feature Store, Forecast Engine/Chronos-2, Ablation, Anomaly Detector, Savings/Carbon, Notification)
+- 실제 BDG2 데이터, 실제 Chronos-2 모델
+- **"마지막 목격 이미지" 저장 API**(2026-09-10): `api/last_seen.py` — `POST /api/v1/last-seen/{zone_id}`(멀티파트 업로드, zone당 1장 upsert), `GET /api/v1/last-seen`(목록), `GET /api/v1/last-seen/{zone_id}/image`(원본 JPEG 서빙). path traversal 방어 포함. `db/schema.py`에 `last_seen_image` 테이블 추가
+- **`dashboard/` 삭제**(2026-09-10) — Front 리포로 이전됨, `main.py`의 `DASHBOARD_DIR`/mount 코드도 같이 정리
+- 테스트 113개, 커버리지 99%
+- Camera↔Server 실 연동 검증 완료(occupancy 업로드 + last-seen 이미지 업로드 둘 다 실제 curl/브라우저로 확인)
 
-- **M4/M5 Forecast Engine**: 실제 Amazon Chronos-2(HuggingFace `amazon/chronos-2`, 456MB) 사용
-- **데이터**: 실제 BDG2(Building Data Genome Project 2), Panther 사이트 사무용 건물 3개, 2017년 8760시간
-- **M6 Ablation Evaluator**, **M7 Anomaly Detector**, **M9 Notification**(WebPush, 가짜 성공처리 없음)
-- **M8 Savings/Carbon Calculator** (`core/savings.py`): 실측 vs 시뮬레이션 kWh 비교 계산 공식만 구현
-- **M10/M11 대시보드** (`Hail_Mary/dashboard/`): 순수 HTML+JS+fetch, REST 폴링(WebSocket 제외), 4개 위젯
-- API: `POST/GET /api/v1/occupancy`(스키마가 Camera의 `uplink.build_occupancy_payload()`와 정확히 일치함을 재확인, 2026-09-09), `GET /api/v1/forecast`, `GET /api/v1/forecast/ablation`, `GET/POST /api/v1/anomaly`, `POST/GET /api/v1/savings`
-- 테스트: 백엔드 92개(커버리지 99%) + 대시보드 순수로직 19개(node:test)
-- **Camera↔Server 실제 연동 검증 완료**: `uplink.py`로 POST 성공, `/live` 조회 확인, `pipeline.py` 전체 라이브 루프도 실서버에 정상 업로드
-- **접근성 검토 아직 안 됨** — 대시보드가 이미 구현됐는데 CLAUDE.md의 "접근성 고려" 규칙은 아직 미적용 상태로 남아있음(2026-09-09 CLAUDE.md 갱신 시 재확인)
+## 완료된 것 — Front 리포 (2026-09-10 신설)
 
-## 오늘(2026-09-09) 해결된 핵심 이슈: `preview.py` count=0 버그
+- Server의 `Hail_Mary/dashboard/`(순수 HTML+JS+CSS, 기능 위주 MVP)를 이전 + `dataviz` 스킬의 검증된 팔레트로 전면 재설계
+- 기존 4카드(점유율/예측그래프/이상알림/절감) + 신규 3개:
+  - **KPI 요약바**(4타일, 상단) — 그래프만 메인이라는 피드백으로 추가
+  - **마지막 목격 이미지 카드** — zone별 갤러리, 상대시간 표시
+  - **리포트/인쇄 카드** — `@media print`로 이 카드만 인쇄되도록 격리
+- 예측 차트를 canvas→SVG로 교체, 호버 크로스헤어+툴팁, 표(table) 보기 토글 추가(접근성 — 차트엔 항상 표 대안)
+- 다크모드 토글(localStorage), 반응형(880/620/520px 브레이크포인트)
+- `format.js` 순수함수 33개 테스트(모킹 없음), CSS `grid-auto-flow: dense`로 레이아웃 빈틈 해결
+- **실제 엔드투엔드 통합 검증**: Server(FastAPI)+Front를 같은 origin으로 임시 결합해 실제 이미지 업로드→표시까지 브라우저로 확인, 콘솔 에러 0건
+- 디자이너 핸드오프용 `기능명세서.md` 작성(화면구성/API/디자인토큰/열린이슈 정리) — 비주얼 리디자인은 디자이너가 이어서 진행할 예정
 
-- 원인: **코드 결함이 아니었음**. 실제 프레임을 캡처해서 진단한 결과 완전히 새까만 화면(평균 밝기 9/255, YOLO가 사람뿐 아니라 전체 클래스 0개 감지)이었고, `AUTO_EXPOSURE`를 강제로 auto로 바꿔도 3.6초간 변화 없어(8.75→9.22) 노출 설정 문제도 아니었음 → **렌즈 가림/조도 부족**으로 결론
-- 사용자가 렌즈/조명 조정 후 `python -m Hail_Mary.vision.preview` 재검증 → 555프레임 동안 `people=1` 안정적으로 감지됨(640×384 해상도 기준). **완전히 해결됨**
+## 개인정보 처리방침 변경 (2026-09-10, 중요)
 
-## 아직 안 된 것 (`TODO.md` 참고, Camera 리포 루트) — 전부 Jetson 실기기·실제 데모 장소가 있어야 진행 가능
+- 원래 정책: 카메라 원본 영상 저장·전송 안 함, 집계 숫자만 외부 전달
+- **변경**: "마지막 목격 이미지" 예외 도입 — zone이 비는 전환 순간의 프레임 1장을 zone당 최신 1장만 저장(누적 로그 아님, 전환마다 교체). 개발자(염세현) 승인으로 도입
+- `문서/제안서.md` 9장, `문서/개발_기능명세서.md` M2 섹션에 이 예외 문서화됨(로컬 전용 파일, git 추적 안 됨 — 팀 공유 시 별도 전달 필요)
+- **후속 조치 필요(미완)**: 영상정보처리기기 설치 고지판 문구에 "이미지가 일시 저장됨" 반영 — 아직 안 씀
 
-- **Jetson 실기기 세팅(JetPack 플래싱)조차 아직 실제로 안 함** — 계속 미뤄지는 중, 1주차 마일스톤(9/9 DoD: "Jetson이 실시간으로 사람 수를 세고 서버 DB에 1분마다 적재") 기준 미달 상태
-- **Zone 실측 캘리브레이션**: 노트북 웹캠으로 미리 해두는 게 무의미하다고 판단(2026-09-09, 사용자 지적) — zone 좌표는 카메라 설치 위치/각도에 종속적이라 실제 Jetson+데모 장소가 있어야 함. 도구(`calibrate.py`) 자체는 코드 레벨 검증 완료, 실행만 미룸
-- **정확도 KPI 실측**(20~30샘플, `accuracy.py`): 같은 이유로 노트북 웹캠 실측은 KPI로 못 씀. 도구는 CLI까지 완비(위 참고), 실행만 대기
-- 서버 실배포 위치 미정(로컬 127.0.0.1만 검증됨), `uplink.py` 엔드포인트를 실제 서버 주소로 바꿔야 함
-- 케이스(외장) 제작 — 4주차 마감이라 안 급함
-- 대시보드 접근성 검토
+## 아직 안 된 것 (`TODO.md` 참고, Camera 리포 루트)
 
-## 카메라 SW 사전구현 가능 항목 — 2026-09-09 기준 소진 확인
-
-명세서(개발_기능명세서.md/개발계획서.md) 대 코드 전수 대조를 두 차례 수행(해상도, confidence, IoU, zone config.yaml 여부, M2/M3 필드명, systemd 가용성 요구사항, 문서 스키마 일치 여부, 패키지 버전 고정, 주차별 일정 항목까지). **결론: Jetson 실기기·실제 데모 장소 없이 지금 코드로 더 할 수 있는 Camera SW 작업은 없음.** 다음에 다시 이 질문이 나오면 이 섹션부터 참고할 것 — 새 코드 변경 없이 같은 대조를 반복하지 않도록.
+- Jetson 실기기 세팅(JetPack 플래싱)조차 아직 안 함 — 계속 미뤄지는 중, 1주차 마일스톤(9/9 DoD) 기준 미달 상태 유지
+- Zone 실측 캘리브레이션, 정확도 KPI 실측 — Jetson+실제 데모 장소 필요, 도구는 코드 레벨 검증 완료
+- 서버 실배포 위치 미정(로컬만 검증됨)
+- 케이스 제작, 발표자료/백업영상/리허설
+- Front 비주얼 리디자인(디자이너 작업 대기)
+- 개인정보 고지판 문구 갱신
 
 ## 보안 노출 이력
 - GitHub PAT(`ghp_...`)가 채팅에 평문 노출된 적 있음 → 폐기 권장함 (폐기 여부 미확인)
