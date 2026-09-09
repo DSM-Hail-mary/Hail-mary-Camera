@@ -7,6 +7,9 @@ and marks them uploaded only after a successful POST.
 
 import sqlite3
 import time
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS occupancy (
@@ -22,13 +25,13 @@ CREATE TABLE IF NOT EXISTS occupancy (
 
 
 class LocalBuffer:
-    def __init__(self, db_path):
+    def __init__(self, db_path: str | Path) -> None:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
         self._conn.execute(SCHEMA)
         self._conn.commit()
 
-    def insert(self, record):
+    def insert(self, record: dict[str, Any]) -> None:
         self._conn.execute(
             "INSERT INTO occupancy (zone_id, window_start, window_end, count, created_at) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -37,7 +40,7 @@ class LocalBuffer:
         )
         self._conn.commit()
 
-    def fetch_pending(self, limit=100):
+    def fetch_pending(self, limit: int = 100) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT id, zone_id, window_start, window_end, count FROM occupancy "
             "WHERE uploaded_at IS NULL ORDER BY id LIMIT ?",
@@ -45,13 +48,13 @@ class LocalBuffer:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def fetch_all(self):
+    def fetch_all(self) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT id, zone_id, window_start, window_end, count FROM occupancy ORDER BY id",
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def mark_uploaded(self, ids):
+    def mark_uploaded(self, ids: Sequence[int]) -> None:
         if not ids:
             return
         placeholders = ",".join("?" for _ in ids)
@@ -61,7 +64,7 @@ class LocalBuffer:
         )
         self._conn.commit()
 
-    def purge_older_than(self, days):
+    def purge_older_than(self, days: float) -> None:
         cutoff = time.time() - days * 86400
         self._conn.execute(
             "DELETE FROM occupancy WHERE uploaded_at IS NOT NULL AND uploaded_at < ?",

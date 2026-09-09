@@ -9,8 +9,11 @@ actual camera once it's connected.
 """
 import argparse
 import time
+from collections.abc import Iterator
+from typing import cast
 
 import cv2
+import numpy as np
 
 PIPELINE_JETSON_CSI = (
     "nvarguscamerasrc sensor-id=0 ! "
@@ -36,12 +39,21 @@ PIPELINES = {
 WINDOW_NAME = "Hail-Mary capture preview"
 
 
-def open_source(backend, source=0, pipeline_str=None, width=None, height=None, fps=None):
+def open_source(
+    backend: str,
+    source: int | str = 0,
+    pipeline_str: str | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int | None = None,
+) -> cv2.VideoCapture:
     """Activate a camera/video source. `source` may be a camera index (int) or a
     file/device path (str) — both are valid cv2.VideoCapture sources, which lets
     tests exercise this against a real video file instead of physical hardware."""
     if backend == "gstreamer":
-        return cv2.VideoCapture(pipeline_str, cv2.CAP_GSTREAMER)
+        # gstreamer callers always supply pipeline_str (see open_capture/PIPELINES);
+        # cast avoids a runtime check that would change behavior for the None case.
+        return cv2.VideoCapture(cast(str, pipeline_str), cv2.CAP_GSTREAMER)
 
     cap = cv2.VideoCapture(source)
     if width:
@@ -53,7 +65,7 @@ def open_source(backend, source=0, pipeline_str=None, width=None, height=None, f
     return cap
 
 
-def stream_frames(cap):
+def stream_frames(cap: cv2.VideoCapture) -> Iterator[np.ndarray]:
     """Yield frames from an opened cv2.VideoCapture until the source is exhausted
     or a read fails. This is the reusable streaming interface other edge modules
     (e.g. zone aggregation) import instead of re-implementing the read loop."""
@@ -64,14 +76,14 @@ def stream_frames(cap):
         yield frame
 
 
-def open_capture(args):
+def open_capture(args: argparse.Namespace) -> cv2.VideoCapture:
     if args.backend == "gstreamer":
         pipeline = args.pipeline_str or PIPELINES[args.pipeline]
         return open_source("gstreamer", pipeline_str=pipeline)
     return open_source("opencv", source=args.source, width=args.width, height=args.height, fps=args.fps)
 
 
-def main():  # pragma: no cover -- interactive CLI loop, needs real camera/display; verified manually via skill-capture-check
+def main() -> None:  # pragma: no cover -- interactive CLI loop, needs real camera/display; verified manually via skill-capture-check
     parser = argparse.ArgumentParser(description="Hail-Mary edge camera capture preview")
     parser.add_argument("--backend", choices=["opencv", "gstreamer"], default="opencv")
     parser.add_argument("--source", type=int, default=0, help="camera index for opencv backend")

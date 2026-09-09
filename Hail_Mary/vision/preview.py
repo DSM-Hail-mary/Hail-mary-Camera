@@ -16,7 +16,7 @@ from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, boxes_from_result, extract
 WINDOW_NAME = "Hail-Mary YOLOv8n preview"
 
 
-def main():  # pragma: no cover -- interactive CLI loop, needs real camera/display/model
+def main() -> None:  # pragma: no cover -- interactive CLI loop, needs real camera/display/model
     print("loading YOLOv8n...", flush=True)
     model = load_model("yolov8n.pt")
     print("model loaded, opening camera...", flush=True)

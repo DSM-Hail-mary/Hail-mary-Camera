@@ -5,13 +5,18 @@ pure geometry question: how many of them fall inside a defined zone polygon. No
 image data or AI model involved here.
 """
 
+from collections.abc import Sequence
+from typing import Any
 
-def bbox_center(bbox):
+Point = tuple[float, float]
+
+
+def bbox_center(bbox: Sequence[float]) -> Point:
     x1, y1, x2, y2 = bbox
     return ((x1 + x2) / 2, (y1 + y2) / 2)
 
 
-def point_in_zone(point, polygon):
+def point_in_zone(point: Point, polygon: Sequence[Point]) -> bool:
     """Ray-casting point-in-polygon test."""
     x, y = point
     inside = False
@@ -27,7 +32,7 @@ def point_in_zone(point, polygon):
     return inside
 
 
-def count_people_in_zone(detections, polygon):
+def count_people_in_zone(detections: Sequence[dict[str, Any]], polygon: Sequence[Point]) -> int:
     return sum(
         1 for detection in detections
         if point_in_zone(bbox_center(detection["bbox"]), polygon)

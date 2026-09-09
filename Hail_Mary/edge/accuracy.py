@@ -8,7 +8,12 @@ exercised manually, same as capture.py/preview.py's main().
 """
 
 import csv
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from Hail_Mary.edge.zones import Point
 
 KPI_TOLERANCE = 1
 KPI_MIN_RATE = 0.9
@@ -23,36 +28,41 @@ class AccuracySample:
 
 
 class AccuracyLog:
-    def __init__(self):
-        self._samples = []
+    def __init__(self) -> None:
+        self._samples: list[AccuracySample] = []
 
-    def record(self, detected_count, actual_count, label=""):
+    def record(self, detected_count: int, actual_count: int, label: str = "") -> None:
         self._samples.append(AccuracySample(detected_count, actual_count, label))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._samples)
 
-    def mae(self):
+    def mae(self) -> float:
         if not self._samples:
             return 0.0
         return sum(abs(s.detected_count - s.actual_count) for s in self._samples) / len(self._samples)
 
-    def within_tolerance_rate(self, tolerance=KPI_TOLERANCE):
+    def within_tolerance_rate(self, tolerance: int = KPI_TOLERANCE) -> float:
         if not self._samples:
             return 0.0
         hits = sum(1 for s in self._samples if abs(s.detected_count - s.actual_count) <= tolerance)
         return hits / len(self._samples)
 
-    def exact_match_rate(self):
+    def exact_match_rate(self) -> float:
         return self.within_tolerance_rate(tolerance=0)
 
-    def meets_kpi(self, tolerance=KPI_TOLERANCE, min_rate=KPI_MIN_RATE, min_samples=KPI_MIN_SAMPLES):
+    def meets_kpi(
+        self,
+        tolerance: int = KPI_TOLERANCE,
+        min_rate: float = KPI_MIN_RATE,
+        min_samples: int = KPI_MIN_SAMPLES,
+    ) -> bool:
         """제안서.md 8.1절: 오차 +-1명 이내(또는 정확도 90% 이상), 4.5절: 20~30회 샘플링 필요."""
         if len(self._samples) < min_samples:
             return False
         return self.within_tolerance_rate(tolerance) >= min_rate
 
-    def summary(self):
+    def summary(self) -> dict[str, Any]:
         return {
             "samples": len(self._samples),
             "mae": self.mae(),
@@ -61,7 +71,7 @@ class AccuracyLog:
             "meets_kpi": self.meets_kpi(),
         }
 
-    def save_csv(self, path):
+    def save_csv(self, path: str | Path) -> None:
         with open(path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["label", "detected_count", "actual_count", "abs_error"])
@@ -70,8 +80,13 @@ class AccuracyLog:
                                   abs(s.detected_count - s.actual_count)])
 
 
-def main(zone_id="hall_main", zone_polygon=None, out_path="accuracy.csv",
-         camera_source=0, min_conf=None):  # pragma: no cover -- live loop needs real camera/model/tester
+def main(
+    zone_id: str = "hall_main",
+    zone_polygon: Sequence[Point] | None = None,
+    out_path: str | Path = "accuracy.csv",
+    camera_source: int | str = 0,
+    min_conf: float | None = None,
+) -> None:  # pragma: no cover -- live loop needs real camera/model/tester
     import cv2
 
     from Hail_Mary.edge.capture import open_source, stream_frames

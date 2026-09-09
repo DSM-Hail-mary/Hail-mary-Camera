@@ -8,30 +8,40 @@ exercised manually (real camera/display), same as capture.py/preview.py.
 """
 
 import json
+from collections.abc import Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from Hail_Mary.edge.zones import Point
+
+if TYPE_CHECKING:
+    import argparse
 
 WINDOW_NAME = "Hail-Mary zone calibration"
 
 
-def save_polygon(path, zone_id, polygon):
+def save_polygon(path: str | Path, zone_id: str, polygon: Sequence[Point]) -> None:
     data = {"zone_id": zone_id, "polygon": [[float(x), float(y)] for x, y in polygon]}
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
 
-def load_polygon(path):
+def load_polygon(path: str | Path) -> tuple[str, list[Point]]:
     with open(path) as f:
         data = json.load(f)
     return data["zone_id"], [tuple(point) for point in data["polygon"]]
 
 
-def main(zone_id="hall_main", out_path="zone.json", camera_source=0):  # pragma: no cover
+def main(zone_id: str = "hall_main", out_path: str | Path = "zone.json", camera_source: int | str = 0) -> None:  # pragma: no cover
     import cv2
 
     from Hail_Mary.edge.capture import open_source, stream_frames
 
-    points = []
+    # mouse-event coords are ints (cv2.circle/line require Sequence[int]); the
+    # broader Point (float,float) alias is used for the saved-polygon contract.
+    points: list[tuple[int, int]] = []
 
-    def on_click(event, x, y, flags, param):
+    def on_click(event: int, x: int, y: int, flags: int, param: object) -> None:
         if event == cv2.EVENT_LBUTTONDOWN:
             points.append((x, y))
 
@@ -73,8 +83,8 @@ def main(zone_id="hall_main", out_path="zone.json", camera_source=0):  # pragma:
         cv2.destroyAllWindows()
 
 
-def _parse_args():  # pragma: no cover
-    import argparse
+def _parse_args() -> "argparse.Namespace":  # pragma: no cover
+    import argparse  # noqa: F811 -- runtime re-import, keeps CLI wiring lazy like the rest of this module
     parser = argparse.ArgumentParser(description="Click to define a zone polygon on the live camera feed")
     parser.add_argument("--zone-id", default="hall_main")
     parser.add_argument("--out", default="zone.json")

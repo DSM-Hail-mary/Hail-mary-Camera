@@ -10,7 +10,10 @@ capture.py/preview.py's main().
 
 import argparse
 import time
+from collections.abc import Sequence
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 from Hail_Mary.edge import capture as capture_module
 from Hail_Mary.edge.aggregator import aggregate_window
@@ -18,20 +21,28 @@ from Hail_Mary.edge.buffer import LocalBuffer
 from Hail_Mary.edge.calibrate import load_polygon
 from Hail_Mary.edge.capture import stream_frames
 from Hail_Mary.edge.uplink import Uplink
+from Hail_Mary.edge.zones import Point
 from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 DEFAULT_ZONE_ID = "hall_main"
-DEFAULT_ZONE_POLYGON = [(0, 0), (1280, 0), (1280, 720), (0, 720)]
+DEFAULT_ZONE_POLYGON: list[Point] = [(0, 0), (1280, 0), (1280, 720), (0, 720)]
 DEFAULT_ENDPOINT_URL = "http://127.0.0.1:8000/api/v1/occupancy"
 DEFAULT_DB_PATH = "occupancy.db"
 
 
-def _iso(epoch_seconds):
+def _iso(epoch_seconds: float) -> str:
     return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def build_capture_args(backend="opencv", camera_source=0, pipeline="jetson_csi",
-                        pipeline_str=None, width=1280, height=720, fps=30):
+def build_capture_args(
+    backend: str = "opencv",
+    camera_source: int | str = 0,
+    pipeline: str = "jetson_csi",
+    pipeline_str: str | None = None,
+    width: int = 1280,
+    height: int = 720,
+    fps: int = 30,
+) -> argparse.Namespace:
     """Same shape capture.open_capture() expects -- reused here instead of
     re-implementing the opencv/gstreamer backend switch."""
     return argparse.Namespace(
@@ -40,35 +51,37 @@ def build_capture_args(backend="opencv", camera_source=0, pipeline="jetson_csi",
     )
 
 
-def resolve_zone(zone_id, zone_polygon, zone_file):
+def resolve_zone(
+    zone_id: str, zone_polygon: Sequence[Point], zone_file: str | Path | None
+) -> tuple[str, Sequence[Point]]:
     if zone_file is None:
         return zone_id, zone_polygon
     return load_polygon(zone_file)
 
 
-def due(last_time, now, interval_seconds):
+def due(last_time: float, now: float, interval_seconds: float) -> bool:
     """True once interval_seconds have passed since last_time -- shared trigger
     logic for both the periodic upload and the periodic buffer purge."""
     return (now - last_time) >= interval_seconds
 
 
 class WindowAccumulator:
-    def __init__(self, zone_id, zone_polygon, window_seconds=60):
+    def __init__(self, zone_id: str, zone_polygon: Sequence[Point], window_seconds: float = 60) -> None:
         self.zone_id = zone_id
         self.zone_polygon = zone_polygon
         self.window_seconds = window_seconds
-        self._frames = []
-        self._window_start = None
+        self._frames: list[dict[str, Any]] = []
+        self._window_start: float | None = None
 
-    def add_frame(self, frame_ts, detections, now):
+    def add_frame(self, frame_ts: float | str, detections: list[dict[str, Any]], now: float) -> None:
         if self._window_start is None:
             self._window_start = now
         self._frames.append({"frame_ts": frame_ts, "detections": detections})
 
-    def ready(self, now):
+    def ready(self, now: float) -> bool:
         return self._window_start is not None and (now - self._window_start) >= self.window_seconds
 
-    def close(self, now):
+    def close(self, now: float) -> dict[str, Any]:
         window_start = self._window_start if self._window_start is not None else now
         record = aggregate_window(
             self._frames,
@@ -83,24 +96,24 @@ class WindowAccumulator:
 
 
 def run(  # pragma: no cover -- live loop needs real camera/model/network
-    backend="opencv",
-    camera_source=0,
-    pipeline="jetson_csi",
-    pipeline_str=None,
-    width=1280,
-    height=720,
-    fps=30,
-    zone_id=DEFAULT_ZONE_ID,
-    zone_polygon=DEFAULT_ZONE_POLYGON,
-    zone_file=None,
-    endpoint_url=DEFAULT_ENDPOINT_URL,
-    db_path=DEFAULT_DB_PATH,
-    window_seconds=60,
-    upload_interval_seconds=60,
-    purge_interval_seconds=3600,
-    retain_days=7,
-    min_conf=DEFAULT_MIN_CONF,
-):
+    backend: str = "opencv",
+    camera_source: int | str = 0,
+    pipeline: str = "jetson_csi",
+    pipeline_str: str | None = None,
+    width: int = 1280,
+    height: int = 720,
+    fps: int = 30,
+    zone_id: str = DEFAULT_ZONE_ID,
+    zone_polygon: Sequence[Point] = DEFAULT_ZONE_POLYGON,
+    zone_file: str | Path | None = None,
+    endpoint_url: str = DEFAULT_ENDPOINT_URL,
+    db_path: str | Path = DEFAULT_DB_PATH,
+    window_seconds: float = 60,
+    upload_interval_seconds: float = 60,
+    purge_interval_seconds: float = 3600,
+    retain_days: float = 7,
+    min_conf: float = DEFAULT_MIN_CONF,
+) -> None:
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
     cap = capture_module.open_capture(build_capture_args(
@@ -148,7 +161,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
         cap.release()
 
 
-def _parse_args():  # pragma: no cover -- thin argparse wiring, exercised manually
+def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wiring, exercised manually
     parser = argparse.ArgumentParser(description="Hail-Mary edge pipeline (capture -> detect -> M2 -> M3)")
     parser.add_argument("--backend", choices=["opencv", "gstreamer"], default="opencv")
     parser.add_argument("--source", type=int, default=0, help="camera index for opencv backend")

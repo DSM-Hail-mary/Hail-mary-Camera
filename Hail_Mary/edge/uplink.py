@@ -9,16 +9,18 @@ import json
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
 class UploadResult:
     success: bool
-    uploaded_ids: list = field(default_factory=list)
+    uploaded_ids: list[int] = field(default_factory=list)
 
 
-def build_occupancy_payload(records):
+def build_occupancy_payload(records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """Assumed contract (unconfirmed with the server): a JSON array of
     {zone_id, window_start, window_end, count}. The local-only `id` is
     stripped before sending."""
@@ -34,12 +36,12 @@ def build_occupancy_payload(records):
 
 
 class Uplink:
-    def __init__(self, endpoint_url, max_retries=3, backoff_seconds=1.0):
+    def __init__(self, endpoint_url: str, max_retries: int = 3, backoff_seconds: float = 1.0) -> None:
         self.endpoint_url = endpoint_url
         self.max_retries = max_retries
         self.backoff_seconds = backoff_seconds
 
-    def upload_batch(self, records):
+    def upload_batch(self, records: Sequence[dict[str, Any]]) -> UploadResult:
         if not records:
             return UploadResult(success=True, uploaded_ids=[])
 
@@ -56,7 +58,7 @@ class Uplink:
 
         return UploadResult(success=False, uploaded_ids=[])
 
-    def _post(self, body):
+    def _post(self, body: bytes) -> bool:
         request = urllib.request.Request(
             self.endpoint_url, data=body,
             headers={"Content-Type": "application/json"}, method="POST",

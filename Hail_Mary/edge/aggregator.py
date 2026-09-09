@@ -5,10 +5,19 @@ occupancy snapshot for a zone. Count = people in the zone in the last frame of
 the window ("how many are here right now", not a cumulative visitor count).
 """
 
-from Hail_Mary.edge.zones import count_people_in_zone
+from collections.abc import Sequence
+from typing import Any
+
+from Hail_Mary.edge.zones import Point, count_people_in_zone
 
 
-def aggregate_window(frames, zone_id, zone_polygon, window_start, window_end):
+def aggregate_window(
+    frames: Sequence[dict[str, Any]],
+    zone_id: str,
+    zone_polygon: Sequence[Point],
+    window_start: str,
+    window_end: str,
+) -> dict[str, Any]:
     if not frames:
         count = 0
     else:
