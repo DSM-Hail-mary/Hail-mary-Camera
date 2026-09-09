@@ -8,3 +8,5 @@ accuracy.csv
 zone.json
 CLAUDE.md
 문서/
+.gstack/
+last_seen/

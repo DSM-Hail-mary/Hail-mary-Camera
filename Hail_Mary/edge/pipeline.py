@@ -15,19 +15,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import cv2
+
 from Hail_Mary.edge import capture as capture_module
 from Hail_Mary.edge.aggregator import aggregate_window
 from Hail_Mary.edge.buffer import LocalBuffer
 from Hail_Mary.edge.calibrate import load_polygon
 from Hail_Mary.edge.capture import stream_frames
+from Hail_Mary.edge.last_seen import LastSeenTracker
+from Hail_Mary.edge.last_seen_uplink import upload_last_seen_image
 from Hail_Mary.edge.uplink import Uplink
-from Hail_Mary.edge.zones import Point
+from Hail_Mary.edge.zones import Point, count_people_in_zone
 from Hail_Mary.vision.detect import DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 DEFAULT_ZONE_ID = "hall_main"
 DEFAULT_ZONE_POLYGON: list[Point] = [(0, 0), (640, 0), (640, 384), (0, 384)]
 DEFAULT_ENDPOINT_URL = "http://127.0.0.1:8000/api/v1/occupancy"
 DEFAULT_DB_PATH = "occupancy.db"
+DEFAULT_LAST_SEEN_DIR = "last_seen"
+DEFAULT_LAST_SEEN_BASE_URL = "http://127.0.0.1:8000"
 
 
 def _iso(epoch_seconds: float) -> str:
@@ -114,6 +120,8 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     retain_days: float = 7,
     min_conf: float = DEFAULT_MIN_CONF,
     iou: float = DEFAULT_IOU,
+    last_seen_dir: str | Path = DEFAULT_LAST_SEEN_DIR,
+    last_seen_base_url: str = DEFAULT_LAST_SEEN_BASE_URL,
 ) -> None:
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
@@ -127,6 +135,9 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     buf = LocalBuffer(db_path)
     uplink = Uplink(endpoint_url)
     window = WindowAccumulator(zone_id, zone_polygon, window_seconds)
+    last_seen_tracker = LastSeenTracker()
+    last_seen_dir = Path(last_seen_dir)
+    last_seen_dir.mkdir(parents=True, exist_ok=True)
     last_upload = time.time()
     last_purge = time.time()
 
@@ -137,6 +148,20 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
             boxes = boxes_from_result(result)
             detections = extract_person_detections(now, boxes, min_conf=min_conf)["detections"]
             window.add_frame(now, detections, now)
+
+            live_count = count_people_in_zone(detections, zone_polygon)
+            if last_seen_tracker.update(zone_id, live_count, now):
+                encode_ok, jpeg = cv2.imencode(".jpg", frame)
+                if encode_ok:
+                    image_bytes = jpeg.tobytes()
+                    (last_seen_dir / f"{zone_id}.jpg").write_bytes(image_bytes)
+                    try:
+                        if upload_last_seen_image(last_seen_base_url, zone_id, image_bytes):
+                            print(f"last-seen image uploaded: zone={zone_id}", flush=True)
+                        else:
+                            print(f"last-seen image upload failed: zone={zone_id}", flush=True)
+                    except Exception as exc:
+                        print(f"last-seen image upload error: zone={zone_id} error={exc}", flush=True)
 
             if window.ready(now):
                 record = window.close(now)
@@ -181,6 +206,8 @@ def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wi
     parser.add_argument("--retain-days", type=int, default=7)
     parser.add_argument("--min-conf", type=float, default=DEFAULT_MIN_CONF)
     parser.add_argument("--iou", type=float, default=DEFAULT_IOU)
+    parser.add_argument("--last-seen-dir", default=DEFAULT_LAST_SEEN_DIR, help="local dir for the latest per-zone last-seen image")
+    parser.add_argument("--last-seen-base-url", default=DEFAULT_LAST_SEEN_BASE_URL, help="server base URL for last-seen image uploads")
     return parser.parse_args()
 
 
@@ -193,4 +220,5 @@ if __name__ == "__main__":  # pragma: no cover
         window_seconds=_args.window_seconds, upload_interval_seconds=_args.upload_interval_seconds,
         purge_interval_seconds=_args.purge_interval_seconds, retain_days=_args.retain_days,
         min_conf=_args.min_conf, iou=_args.iou,
+        last_seen_dir=_args.last_seen_dir, last_seen_base_url=_args.last_seen_base_url,
     )
