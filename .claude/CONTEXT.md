@@ -2,7 +2,7 @@
 
 > 이 파일은 매 머지(merge) 시점마다 **덮어써서** 최신 상태만 남긴다 (누적 로그 아님). 목적: 세션이 끊겨도 지금까지 결정된 것/진행 상황을 놓치지 않기 위함.
 
-**최종 갱신**: 2026-09-10 (그래프 종류 탭 추가)
+**최종 갱신**: 2026-09-11 (Server 배포 설정 추가)
 
 ## 저장소 구조 (3개로 분리됨)
 
@@ -40,6 +40,7 @@
 - **`dashboard/` 삭제**(2026-09-10) — Front 리포로 이전됨, `main.py`의 `DASHBOARD_DIR`/mount 코드도 같이 정리
 - 테스트 113개, 커버리지 99%
 - Camera↔Server 실 연동 검증 완료(occupancy 업로드 + last-seen 이미지 업로드 둘 다 실제 curl/브라우저로 확인)
+- **배포 설정 추가**(2026-09-11): `systemd/hail-mary-server.service`(재부팅/크래시 자동복구, edge 유닛과 동일 패턴) + 루트 `README.md`(프로덕션 실행: `uvicorn ... --host 0.0.0.0 --port 8000`, `HAIL_MARY_DB_PATH` 환경변수). `--host 0.0.0.0` 실제 기동 후 `/health`+실제 API 200 응답 확인(기본값 127.0.0.1로는 Jetson 엣지 기기 접근 불가하다는 점도 이때 확인). systemd 자체 검증은 edge 유닛과 동일한 한계(Windows 개발 PC라 `systemd-analyze verify` 불가, 수동 문법 재검토만)
 
 ## 완료된 것 — Front 리포 (2026-09-10 신설)
 

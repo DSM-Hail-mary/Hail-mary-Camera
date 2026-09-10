@@ -28,7 +28,8 @@
 
 ## 백엔드/프론트 — 남은 것
 
-- [ ] 서버 실배포 위치 확정 (지금은 로컬 `127.0.0.1:8000`만 검증됨) — Jetson의 `uplink.py`/`last_seen_uplink.py` 엔드포인트를 실제 서버 주소로 변경 필요
+- [x] 서버 배포 설정 준비(2026-09-11) — `Hail-mary-Server`에 `systemd/hail-mary-server.service`(재부팅/크래시 자동복구) + 루트 `README.md`(프로덕션 실행법: `--host 0.0.0.0`, `HAIL_MARY_DB_PATH`) 추가, `--host 0.0.0.0 --port 8000` 실제 기동+`/health`/실제 API 응답 확인함
+- [ ] 서버 실배포 "위치"(어느 머신/IP) 확정은 여전히 미정 — 배포 도구는 준비됐지만 조직 차원의 결정 필요. 정해지면 Jetson의 `uplink.py`/`last_seen_uplink.py` 엔드포인트를 그 주소로 변경
 - [ ] `Hail-mary-Front` 리포에 넘긴 `기능명세서.md` 기준으로 디자이너 비주얼 리디자인 반영 대기
 
 ## 하드웨어/현장
