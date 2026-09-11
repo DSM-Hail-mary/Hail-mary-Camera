@@ -1,6 +1,7 @@
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any
 
 import pytest
 
@@ -18,7 +19,7 @@ def _sample_record(record_id, count=3):
 
 
 class _AcceptingHandler(BaseHTTPRequestHandler):
-    received_bodies = []
+    received_bodies: list[Any] = []
 
     def do_POST(self):
         length = int(self.headers["Content-Length"])

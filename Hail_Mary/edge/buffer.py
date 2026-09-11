@@ -3,12 +3,22 @@
 Every record aggregator.py produces is inserted here first so nothing is lost
 if the network/server is unreachable. Upload (uplink.py) reads pending rows
 and marks them uploaded only after a successful POST.
+
+Growth is intentionally unbounded for rows that have never uploaded
+successfully: purge_older_than() only ever deletes rows with uploaded_at
+IS NOT NULL (code review 2026-09-11 flagged this as worth calling out
+explicitly). If the server is unreachable for longer than retain_days, the
+backlog keeps growing on disk rather than dropping data -- a deliberate
+"never lose an occupancy record" tradeoff, not a bug, but it means a
+sustained outage needs disk-space monitoring on the Jetson side, since
+nothing here will ever evict an unsent row on its own.
 """
 
 import sqlite3
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from types import TracebackType
 from typing import Any
 
 SCHEMA = """
@@ -71,3 +81,17 @@ class LocalBuffer:
             (cutoff,),
         )
         self._conn.commit()
+
+    def close(self) -> None:
+        self._conn.close()
+
+    def __enter__(self) -> "LocalBuffer":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()

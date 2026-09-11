@@ -84,3 +84,32 @@ def test_upload_last_seen_image_returns_false_on_connection_error():
     result = upload_last_seen_image("http://127.0.0.1:1", "hall_main", SAMPLE_JPEG_BYTES, timeout=0.5)
 
     assert result is False
+
+
+def test_upload_last_seen_image_rejects_path_traversal_zone_id_without_a_request(real_http_server):
+    # Code review 2026-09-11: zone_id was spliced into the URL unvalidated
+    # (f"{base_url}/api/v1/last-seen/{zone_id}") -- a zone_id containing
+    # "../" would misroute the request entirely. No network call should even
+    # be attempted for an invalid zone_id.
+    _AcceptingHandler.received_paths = []
+    base_url = real_http_server(_AcceptingHandler)
+
+    result = upload_last_seen_image(base_url, "../escape", SAMPLE_JPEG_BYTES)
+
+    assert result is False
+    assert _AcceptingHandler.received_paths == []
+
+
+def test_upload_last_seen_image_url_encodes_zone_id_with_special_characters(real_http_server):
+    # A zone_id built via plain f-string interpolation (no urllib.parse.quote)
+    # would send a malformed/misrouted request line for characters like
+    # spaces. zone_id itself stays a legal filename-ish token per
+    # is_valid_zone_id(), but must still round-trip safely through a URL.
+    _AcceptingHandler.received_paths = []
+    _AcceptingHandler.received_images = []
+    base_url = real_http_server(_AcceptingHandler)
+
+    result = upload_last_seen_image(base_url, "hall main", SAMPLE_JPEG_BYTES)
+
+    assert result is True
+    assert _AcceptingHandler.received_paths == ["/api/v1/last-seen/hall%20main"]

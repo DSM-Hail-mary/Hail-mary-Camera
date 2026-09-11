@@ -15,7 +15,7 @@ DEFAULT_IOU = 0.5  # 개발_기능명세서.md M1: NMS IoU 기본값 0.5, applie
 
 
 def extract_person_detections(
-    frame_ts: float | str, boxes: Sequence[dict[str, Any]], min_conf: float = 0.0
+    frame_ts: float | str, boxes: Sequence[dict[str, Any]], min_conf: float = DEFAULT_MIN_CONF
 ) -> dict[str, Any]:
     detections = [
         {

@@ -84,3 +84,34 @@ def test_insert_survives_across_separate_buffer_instances(tmp_path):
 
     assert len(pending) == 1
     assert pending[0]["count"] == 7
+
+
+def test_close_closes_the_underlying_connection(tmp_path):
+    # Code review 2026-09-11: LocalBuffer had no close()/__exit__ at all, and
+    # pipeline.py's `finally` block only released the camera -- the sqlite
+    # connection leaked on every run() exit. A closed connection raises
+    # sqlite3.ProgrammingError on further use, so that's the observable proof.
+    import sqlite3
+
+    import pytest
+
+    buf = LocalBuffer(tmp_path / "occupancy.db")
+    buf.insert(_sample_record())
+
+    buf.close()
+
+    with pytest.raises(sqlite3.ProgrammingError):
+        buf.fetch_pending(limit=10)
+
+
+def test_context_manager_closes_on_exit(tmp_path):
+    with LocalBuffer(tmp_path / "occupancy.db") as buf:
+        buf.insert(_sample_record())
+        assert len(buf.fetch_pending(limit=10)) == 1
+
+    import sqlite3
+
+    import pytest
+
+    with pytest.raises(sqlite3.ProgrammingError):
+        buf.fetch_pending(limit=10)

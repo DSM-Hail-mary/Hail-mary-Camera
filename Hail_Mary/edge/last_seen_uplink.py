@@ -9,8 +9,11 @@ uplink.py.
 """
 
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
+
+from Hail_Mary.edge.last_seen import is_valid_zone_id
 
 _BOUNDARY_PREFIX = "hail-mary-last-seen-boundary-"
 
@@ -27,9 +30,17 @@ def _build_multipart_body(image_bytes: bytes, boundary: str) -> bytes:
 
 
 def upload_last_seen_image(base_url: str, zone_id: str, image_bytes: bytes, timeout: float = 5.0) -> bool:
+    # zone_id comes straight from --zone-id/zone.json (calibrate.py), never
+    # validated before this -- reject anything that could escape the URL
+    # path (path traversal) before attempting a request, and percent-encode
+    # whatever's left so a legal-but-unusual zone_id (spaces, unicode) can't
+    # produce a malformed request line.
+    if not is_valid_zone_id(zone_id):
+        return False
+
     boundary = f"{_BOUNDARY_PREFIX}{uuid.uuid4().hex}"
     body = _build_multipart_body(image_bytes, boundary)
-    url = f"{base_url}/api/v1/last-seen/{zone_id}"
+    url = f"{base_url}/api/v1/last-seen/{urllib.parse.quote(zone_id, safe='')}"
 
     request = urllib.request.Request(
         url, data=body,

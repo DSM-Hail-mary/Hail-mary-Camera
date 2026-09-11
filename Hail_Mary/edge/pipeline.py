@@ -22,7 +22,7 @@ from Hail_Mary.edge.aggregator import aggregate_window
 from Hail_Mary.edge.buffer import LocalBuffer
 from Hail_Mary.edge.calibrate import load_polygon
 from Hail_Mary.edge.capture import stream_frames
-from Hail_Mary.edge.last_seen import LastSeenTracker
+from Hail_Mary.edge.last_seen import LastSeenTracker, save_last_seen_locally
 from Hail_Mary.edge.last_seen_uplink import upload_last_seen_image
 from Hail_Mary.edge.uplink import Uplink
 from Hail_Mary.edge.zones import Point, count_people_in_zone
@@ -142,6 +142,16 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     last_purge = time.time()
 
     try:
+        # Note (code review 2026-09-11): the last-seen upload below and the
+        # periodic buf uplink further down both run synchronously inline in
+        # this per-frame loop. Since capture uses `appsink drop=1`
+        # (capture.py), a slow/unreachable server stalls frame consumption
+        # for the duration of that call, and frames produced during the
+        # stall are dropped rather than buffered -- degrading live occupancy
+        # accuracy during an outage, not just upload latency. Accepted for
+        # now (uplink.py's own retry/backoff already bounds each attempt),
+        # but worth reconsidering (e.g. a background upload thread) if that
+        # accuracy loss is observed during an actual outage.
         for frame in stream_frames(cap):
             now = time.time()
             result = model.track(frame, persist=True, verbose=False, classes=[0], iou=iou)[0]
@@ -154,7 +164,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
                 encode_ok, jpeg = cv2.imencode(".jpg", frame)
                 if encode_ok:
                     image_bytes = jpeg.tobytes()
-                    (last_seen_dir / f"{zone_id}.jpg").write_bytes(image_bytes)
+                    save_last_seen_locally(last_seen_dir, zone_id, image_bytes)
                     try:
                         if upload_last_seen_image(last_seen_base_url, zone_id, image_bytes):
                             print(f"last-seen image uploaded: zone={zone_id}", flush=True)
@@ -185,6 +195,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
                 last_purge = now
     finally:
         cap.release()
+        buf.close()
 
 
 def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wiring, exercised manually

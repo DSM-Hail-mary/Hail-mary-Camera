@@ -1,4 +1,4 @@
-from Hail_Mary.vision.detect import PERSON_CLASS_ID, extract_person_detections
+from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, PERSON_CLASS_ID, extract_person_detections
 
 
 def _box(cls, conf, xyxy, track_id):
@@ -59,9 +59,18 @@ def test_extract_person_detections_drops_boxes_below_min_conf():
     assert result["detections"][0]["track_id"] == 1
 
 
-def test_extract_person_detections_default_min_conf_keeps_typical_yolo_confidences():
-    boxes = [_box(cls=PERSON_CLASS_ID, conf=0.3, xyxy=(10, 10, 30, 30), track_id=1)]
+def test_extract_person_detections_default_min_conf_is_the_documented_default():
+    # Code review 2026-09-11: this function's own implicit default used to be
+    # 0.0 (accept everything), silently contradicting DEFAULT_MIN_CONF=0.45
+    # and the "applied consistently across pipeline.py/accuracy.py/preview.py"
+    # comment right above it in detect.py -- latent because every real caller
+    # passed DEFAULT_MIN_CONF explicitly. Now the function's own default *is*
+    # DEFAULT_MIN_CONF, so calling it with no min_conf behaves the same as
+    # every production call site.
+    below_threshold = _box(cls=PERSON_CLASS_ID, conf=DEFAULT_MIN_CONF - 0.05, xyxy=(10, 10, 30, 30), track_id=1)
+    at_threshold = _box(cls=PERSON_CLASS_ID, conf=DEFAULT_MIN_CONF, xyxy=(50, 50, 90, 90), track_id=2)
 
-    result = extract_person_detections("2026-09-08T09:00:00Z", boxes)
+    result = extract_person_detections("2026-09-08T09:00:00Z", [below_threshold, at_threshold])
 
     assert len(result["detections"]) == 1
+    assert result["detections"][0]["track_id"] == 2
