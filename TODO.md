@@ -34,7 +34,7 @@
 - [x] **(2026-09-13) `POST /api/v1/anomaly` 추가** — `detect_anomalies()` 결과를 실제로 적재할 라우트가 아예 없던 gap을 메움(`insert_anomaly_events()`가 자기 테스트에서만 호출되던 상태였음). `POST /api/v1/occupancy`와 동일한 idempotent 배치 업로드 패턴, 테스트 3개 추가
 - [ ] **(2026-09-13 리뷰로 발견, 위 항목으로 절반 해결) M5(예측)→M7(이상탐지)→M9(알림) 파이프라인을 누가/언제 실행할지 결정 필요** — 적재 라우트는 생겼지만, `forecast_engine.py`로 예측을 만들고 `anomaly_detector.py`로 이상탐지를 돌려서 위 라우트로 실제로 POST하는 주체가 아직 없음(요청-응답 안에서 Chronos-2를 돌리면 `forecast.py`가 명시한 "예측 API ≤1s" 요구를 위반하므로 별도 배치/스케줄 작업이어야 함). cron/systemd timer로 주기 실행할지, occupancy 신규 적재 시 트리거할지 등 스케줄링 방식은 개발자 결정 필요
 - [ ] **(2026-09-13 리뷰로 발견) 알림(M9) 실제 발송은 구독자 인프라 자체가 없어서 여전히 막혀 있음** — `notifier.py`의 `send_anomaly_notifications()`는 실제 Web Push를 시도하는 진짜 구현이지만, 누가 구독했는지 저장하는 테이블/엔드포인트가 전혀 없어 보낼 대상이 없음. 데모에 알림까지 필요한지부터 결정 — 필요 없다면 이 항목은 스코프 제외로 문서에 명시하는 것만으로 충분
-- [ ] **(2026-09-13 리뷰로 발견) API 키 인증 미구현** — `제안서_백엔드추가.md` 4.4.4가 "데모 범위에서는 단순 API 키로 시작"이라고 명시했으나 현재 모든 엔드포인트가 인증 없이 열려 있음(로컬/LAN 데모라 실질 위험은 낮음). 엣지 업로드(POST)만 막을지, 대시보드 조회(GET)까지 막을지(막으면 Front가 키를 어떻게 들고 있을지도 같이 결정해야 함) 범위 결정 필요
+- [x] **API 키 인증 구현(2026-09-13)** — 스코프 결정: 엣지 업로드(POST occupancy/anomaly/last-seen, savings)만 보호, 대시보드 GET과 브라우저가 직접 호출하는 이상알림 "확인"은 계속 열어둠(Front가 키를 안전하게 보관할 곳이 없어서). `HAIL_MARY_API_KEY` 미설정 시(기본값) 전부 열림 — 기존 배포/테스트 깨지지 않음. Server(`require_api_key` 의존성) + Camera(`Uplink`/`upload_last_seen_image`에 `--api-key`, systemd 유닛에 placeholder) 양쪽 다 구현, 실제 uvicorn으로 401/200 왕복 확인함
 
 ## 하드웨어/현장
 

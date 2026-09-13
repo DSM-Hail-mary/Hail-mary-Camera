@@ -29,7 +29,13 @@ def _build_multipart_body(image_bytes: bytes, boundary: str) -> bytes:
     return b"".join(parts)
 
 
-def upload_last_seen_image(base_url: str, zone_id: str, image_bytes: bytes, timeout: float = 5.0) -> bool:
+def upload_last_seen_image(
+    base_url: str,
+    zone_id: str,
+    image_bytes: bytes,
+    timeout: float = 5.0,
+    api_key: str | None = None,
+) -> bool:
     # zone_id comes straight from --zone-id/zone.json (calibrate.py), never
     # validated before this -- reject anything that could escape the URL
     # path (path traversal) before attempting a request, and percent-encode
@@ -42,10 +48,10 @@ def upload_last_seen_image(base_url: str, zone_id: str, image_bytes: bytes, time
     body = _build_multipart_body(image_bytes, boundary)
     url = f"{base_url}/api/v1/last-seen/{urllib.parse.quote(zone_id, safe='')}"
 
-    request = urllib.request.Request(
-        url, data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST",
-    )
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    if api_key:
+        headers["X-API-Key"] = api_key
+    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return 200 <= response.status < 300

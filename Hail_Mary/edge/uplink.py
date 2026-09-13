@@ -36,10 +36,17 @@ def build_occupancy_payload(records: Sequence[dict[str, Any]]) -> list[dict[str,
 
 
 class Uplink:
-    def __init__(self, endpoint_url: str, max_retries: int = 3, backoff_seconds: float = 1.0) -> None:
+    def __init__(
+        self,
+        endpoint_url: str,
+        max_retries: int = 3,
+        backoff_seconds: float = 1.0,
+        api_key: str | None = None,
+    ) -> None:
         self.endpoint_url = endpoint_url
         self.max_retries = max_retries
         self.backoff_seconds = backoff_seconds
+        self.api_key = api_key
 
     def upload_batch(self, records: Sequence[dict[str, Any]]) -> UploadResult:
         if not records:
@@ -59,10 +66,10 @@ class Uplink:
         return UploadResult(success=False, uploaded_ids=[])
 
     def _post(self, body: bytes) -> bool:
-        request = urllib.request.Request(
-            self.endpoint_url, data=body,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        request = urllib.request.Request(self.endpoint_url, data=body, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
                 return 200 <= response.status < 300

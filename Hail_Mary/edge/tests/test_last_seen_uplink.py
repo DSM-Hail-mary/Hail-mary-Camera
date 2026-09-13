@@ -13,9 +13,11 @@ SAMPLE_JPEG_BYTES = b"\xff\xd8\xff\xe0fake-jpeg-bytes-for-test\xff\xd9"
 class _AcceptingHandler(BaseHTTPRequestHandler):
     received_paths: list[str] = []
     received_images: list[bytes] = []
+    received_api_keys: list = []
 
     def do_POST(self):
         _AcceptingHandler.received_paths.append(self.path)
+        _AcceptingHandler.received_api_keys.append(self.headers.get("X-API-Key"))
         content_type = self.headers["Content-Type"]
         length = int(self.headers["Content-Length"])
         form = cgi.FieldStorage(
@@ -69,6 +71,28 @@ def test_upload_last_seen_image_succeeds_against_a_real_server(real_http_server)
     assert result is True
     assert _AcceptingHandler.received_paths == ["/api/v1/last-seen/hall_main"]
     assert _AcceptingHandler.received_images == [SAMPLE_JPEG_BYTES]
+
+
+def test_upload_last_seen_image_sends_no_api_key_header_by_default(real_http_server):
+    # Same rationale as uplink.py's Uplink -- the server's X-API-Key
+    # requirement is opt-in, so the default (no api_key argument) must send
+    # no header, matching every deployment that hasn't configured
+    # HAIL_MARY_API_KEY yet.
+    _AcceptingHandler.received_api_keys = []
+    base_url = real_http_server(_AcceptingHandler)
+
+    upload_last_seen_image(base_url, "hall_main", SAMPLE_JPEG_BYTES)
+
+    assert _AcceptingHandler.received_api_keys == [None]
+
+
+def test_upload_last_seen_image_sends_the_configured_api_key_header(real_http_server):
+    _AcceptingHandler.received_api_keys = []
+    base_url = real_http_server(_AcceptingHandler)
+
+    upload_last_seen_image(base_url, "hall_main", SAMPLE_JPEG_BYTES, api_key="demo-key-123")
+
+    assert _AcceptingHandler.received_api_keys == ["demo-key-123"]
 
 
 def test_upload_last_seen_image_returns_false_on_server_error(real_http_server):

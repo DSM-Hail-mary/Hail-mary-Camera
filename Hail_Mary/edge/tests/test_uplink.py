@@ -20,15 +20,36 @@ def _sample_record(record_id, count=3):
 
 class _AcceptingHandler(BaseHTTPRequestHandler):
     received_bodies: list[Any] = []
+    received_api_keys: list[Any] = []
 
     def do_POST(self):
         length = int(self.headers["Content-Length"])
         body = self.rfile.read(length)
         _AcceptingHandler.received_bodies.append(json.loads(body))
+        _AcceptingHandler.received_api_keys.append(self.headers.get("X-API-Key"))
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps({"accepted": len(_AcceptingHandler.received_bodies[-1])}).encode())
+
+    def log_message(self, *args):
+        pass
+
+
+class _RejectingWithoutKeyHandler(BaseHTTPRequestHandler):
+    """Mirrors the server's require_api_key(): 401 unless X-API-Key matches."""
+
+    def do_POST(self):
+        length = int(self.headers["Content-Length"])
+        self.rfile.read(length)
+        if self.headers.get("X-API-Key") != "demo-key-123":
+            self.send_response(401)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"accepted": 1}).encode())
 
     def log_message(self, *args):
         pass
@@ -140,6 +161,54 @@ def test_upload_batch_reports_failure_on_connection_error():
 
     assert result.success is False
     assert result.uploaded_ids == []
+
+
+def test_upload_batch_sends_no_api_key_header_by_default(real_http_server):
+    # Code review 2026-09-13: the server gained an opt-in X-API-Key
+    # requirement on write endpoints, but Uplink had no way to send one at
+    # all -- turning that requirement on server-side would silently break
+    # every real edge upload. Default (no api_key given) must stay
+    # unchanged: no header sent, matching every deployment that hasn't
+    # configured HAIL_MARY_API_KEY yet.
+    _AcceptingHandler.received_bodies = []
+    _AcceptingHandler.received_api_keys = []
+    url = real_http_server(_AcceptingHandler)
+
+    uplink = Uplink(url)
+    result = uplink.upload_batch([_sample_record(1)])
+
+    assert result.success is True
+    assert _AcceptingHandler.received_api_keys == [None]
+
+
+def test_upload_batch_sends_the_configured_api_key_header(real_http_server):
+    _AcceptingHandler.received_bodies = []
+    _AcceptingHandler.received_api_keys = []
+    url = real_http_server(_AcceptingHandler)
+
+    uplink = Uplink(url, api_key="demo-key-123")
+    result = uplink.upload_batch([_sample_record(1)])
+
+    assert result.success is True
+    assert _AcceptingHandler.received_api_keys == ["demo-key-123"]
+
+
+def test_upload_batch_fails_against_a_real_server_requiring_a_key_without_one(real_http_server):
+    url = real_http_server(_RejectingWithoutKeyHandler)
+    uplink = Uplink(url, max_retries=1, backoff_seconds=0.01)  # no api_key
+
+    result = uplink.upload_batch([_sample_record(1)])
+
+    assert result.success is False
+
+
+def test_upload_batch_succeeds_against_a_real_server_requiring_the_matching_key(real_http_server):
+    url = real_http_server(_RejectingWithoutKeyHandler)
+    uplink = Uplink(url, api_key="demo-key-123")
+
+    result = uplink.upload_batch([_sample_record(1)])
+
+    assert result.success is True
 
 
 def test_upload_batch_retries_and_eventually_succeeds(real_http_server):

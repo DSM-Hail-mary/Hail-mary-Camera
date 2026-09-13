@@ -9,6 +9,7 @@ capture.py/preview.py's main().
 """
 
 import argparse
+import os
 import time
 from collections.abc import Sequence
 from datetime import datetime, timezone
@@ -122,6 +123,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
     iou: float = DEFAULT_IOU,
     last_seen_dir: str | Path = DEFAULT_LAST_SEEN_DIR,
     last_seen_base_url: str = DEFAULT_LAST_SEEN_BASE_URL,
+    api_key: str | None = None,
 ) -> None:
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
@@ -145,7 +147,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
             raise SystemExit(f"Failed to open capture (backend={backend})")
 
         buf = LocalBuffer(db_path)
-        uplink = Uplink(endpoint_url)
+        uplink = Uplink(endpoint_url, api_key=api_key)
         window = WindowAccumulator(zone_id, zone_polygon, window_seconds)
         last_seen_tracker = LastSeenTracker()
         last_seen_dir = Path(last_seen_dir)
@@ -177,7 +179,7 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
                     image_bytes = jpeg.tobytes()
                     save_last_seen_locally(last_seen_dir, zone_id, image_bytes)
                     try:
-                        if upload_last_seen_image(last_seen_base_url, zone_id, image_bytes):
+                        if upload_last_seen_image(last_seen_base_url, zone_id, image_bytes, api_key=api_key):
                             print(f"last-seen image uploaded: zone={zone_id}", flush=True)
                         else:
                             print(f"last-seen image upload failed: zone={zone_id}", flush=True)
@@ -232,6 +234,11 @@ def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wi
     parser.add_argument("--iou", type=float, default=DEFAULT_IOU)
     parser.add_argument("--last-seen-dir", default=DEFAULT_LAST_SEEN_DIR, help="local dir for the latest per-zone last-seen image")
     parser.add_argument("--last-seen-base-url", default=DEFAULT_LAST_SEEN_BASE_URL, help="server base URL for last-seen image uploads")
+    parser.add_argument(
+        "--api-key", default=os.environ.get("HAIL_MARY_API_KEY"),
+        help="X-API-Key sent with occupancy/last-seen uploads if the server has HAIL_MARY_API_KEY set "
+             "(defaults to this process's own HAIL_MARY_API_KEY env var, so systemd can inject it without a CLI flag)",
+    )
     return parser.parse_args()
 
 
@@ -245,4 +252,5 @@ if __name__ == "__main__":  # pragma: no cover
         purge_interval_seconds=_args.purge_interval_seconds, retain_days=_args.retain_days,
         min_conf=_args.min_conf, iou=_args.iou,
         last_seen_dir=_args.last_seen_dir, last_seen_base_url=_args.last_seen_base_url,
+        api_key=_args.api_key,
     )

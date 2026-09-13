@@ -33,6 +33,10 @@ WorkingDirectory=/home/orin/Jetson
 # venv를 쓸 경우 ExecStart의 python 경로도 venv 내부 python으로 바꿀 것(placeholder: 시스템 python3).
 Environment=PYTHONPATH=/home/orin/Jetson
 Environment=PYTHONUNBUFFERED=1
+# TODO(실서버 배포 시, 서버에서 HAIL_MARY_API_KEY를 설정한 경우에만): 같은 값을 여기 채울 것.
+# pipeline.py의 --api-key 기본값이 이 환경변수를 그대로 읽으므로 커맨드라인 수정 불필요
+# (2026-09-13 추가 -- 서버 쓰기 엔드포인트에 옵트인 API 키 보호가 생김).
+Environment=HAIL_MARY_API_KEY=
 
 # TODO(Jetson 현장 세팅): --source/--zone-file/--endpoint 등 실제 카메라·존·서버 값으로 조정 필요.
 # 아래 예시는 CSI 카메라 + GStreamer 백엔드 + calibrate.py로 만든 zone 파일을 쓰는 전형적인 배포 형태.
