@@ -125,23 +125,34 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
 ) -> None:
     zone_id, zone_polygon = resolve_zone(zone_id, zone_polygon, zone_file)
     model = load_model("yolov8n.pt")
-    cap = capture_module.open_capture(build_capture_args(
-        backend=backend, camera_source=camera_source, pipeline=pipeline,
-        pipeline_str=pipeline_str, width=width, height=height, fps=fps,
-    ))
-    if not cap.isOpened():
-        raise SystemExit(f"Failed to open capture (backend={backend})")
 
-    buf = LocalBuffer(db_path)
-    uplink = Uplink(endpoint_url)
-    window = WindowAccumulator(zone_id, zone_polygon, window_seconds)
-    last_seen_tracker = LastSeenTracker()
-    last_seen_dir = Path(last_seen_dir)
-    last_seen_dir.mkdir(parents=True, exist_ok=True)
-    last_upload = time.time()
-    last_purge = time.time()
-
+    # cap/buf are acquired outside the try/finally below (LocalBuffer(),
+    # last_seen_dir.mkdir(), etc. can each raise -- e.g. db_path's parent
+    # missing, disk full/read-only). Before this fix, an exception in any of
+    # them left the just-opened camera handle unreleased, since the
+    # try/finally only wrapped the frame loop itself (code review
+    # 2026-09-13). Initialize both to None and guard each in finally so
+    # whichever resources actually got acquired always get released,
+    # regardless of where setup fails.
+    cap = None
+    buf = None
     try:
+        cap = capture_module.open_capture(build_capture_args(
+            backend=backend, camera_source=camera_source, pipeline=pipeline,
+            pipeline_str=pipeline_str, width=width, height=height, fps=fps,
+        ))
+        if not cap.isOpened():
+            raise SystemExit(f"Failed to open capture (backend={backend})")
+
+        buf = LocalBuffer(db_path)
+        uplink = Uplink(endpoint_url)
+        window = WindowAccumulator(zone_id, zone_polygon, window_seconds)
+        last_seen_tracker = LastSeenTracker()
+        last_seen_dir = Path(last_seen_dir)
+        last_seen_dir.mkdir(parents=True, exist_ok=True)
+        last_upload = time.time()
+        last_purge = time.time()
+
         # Note (code review 2026-09-11): the last-seen upload below and the
         # periodic buf uplink further down both run synchronously inline in
         # this per-frame loop. Since capture uses `appsink drop=1`
@@ -194,8 +205,10 @@ def run(  # pragma: no cover -- live loop needs real camera/model/network
                 print(f"purged records older than {retain_days} days", flush=True)
                 last_purge = now
     finally:
-        cap.release()
-        buf.close()
+        if cap is not None:
+            cap.release()
+        if buf is not None:
+            buf.close()
 
 
 def _parse_args() -> argparse.Namespace:  # pragma: no cover -- thin argparse wiring, exercised manually
