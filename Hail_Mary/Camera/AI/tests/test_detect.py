@@ -1,4 +1,4 @@
-from Hail_Mary.vision.detect import DEFAULT_MIN_CONF, PERSON_CLASS_ID, extract_person_detections
+from Hail_Mary.Camera.AI.detect import DEFAULT_MIN_CONF, PERSON_CLASS_ID, extract_person_detections
 
 
 def _box(cls, conf, xyxy, track_id):

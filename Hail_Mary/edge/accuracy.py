@@ -94,12 +94,12 @@ def main(
 ) -> None:  # pragma: no cover -- live loop needs real camera/model/tester
     import cv2
 
-    from Hail_Mary.edge.capture import open_source, stream_frames
-    from Hail_Mary.edge.pipeline import resolve_zone
-    from Hail_Mary.edge.zones import count_people_in_zone
-    from Hail_Mary.vision.detect import (
+    from Hail_Mary.Camera.AI.detect import (
         DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model,
     )
+    from Hail_Mary.Camera.capture import open_source, stream_frames
+    from Hail_Mary.edge.pipeline import resolve_zone
+    from Hail_Mary.edge.zones import count_people_in_zone
 
     if min_conf is None:
         min_conf = DEFAULT_MIN_CONF
@@ -155,8 +155,8 @@ def _parse_args() -> "argparse.Namespace":  # pragma: no cover -- thin argparse 
     parser.add_argument("--zone-file", default=None, help="JSON polygon from calibrate.py, overrides --zone-id/defaults")
     parser.add_argument("--out", default="accuracy.csv")
     parser.add_argument("--source", type=int, default=0, help="camera index")
-    parser.add_argument("--min-conf", type=float, default=None, help="defaults to vision.detect.DEFAULT_MIN_CONF")
-    parser.add_argument("--iou", type=float, default=None, help="defaults to vision.detect.DEFAULT_IOU")
+    parser.add_argument("--min-conf", type=float, default=None, help="defaults to Camera.AI.detect.DEFAULT_MIN_CONF")
+    parser.add_argument("--iou", type=float, default=None, help="defaults to Camera.AI.detect.DEFAULT_IOU")
     return parser.parse_args()
 
 

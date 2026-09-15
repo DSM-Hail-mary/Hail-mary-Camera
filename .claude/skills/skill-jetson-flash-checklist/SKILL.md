@@ -18,7 +18,7 @@ description: Jetson Orin Nano JetPack 플래싱 및 최초 카메라 연결 체�
 ## 플래싱 당일
 - [ ] JetPack 플래싱 완료 후 최초 부팅 확인
 - [ ] 카메라 연결 후 `ls /dev/video*` (USB) 또는 `v4l2-ctl --list-devices`로 인식 확인
-- [ ] `Hail_Mary/edge/capture.py --backend gstreamer --pipeline jetson_csi --no-preview --duration 5` 로 실제 프레임 수신 확인 (skill: capture-check)
+- [ ] `Hail_Mary/Camera/capture.py --backend gstreamer --pipeline jetson_csi --no-preview --duration 5` 로 실제 프레임 수신 확인 (skill: capture-check)
 - [ ] 실패 시 `PIPELINE_JETSON_CSI`/`PIPELINE_JETSON_USB`의 sensor-id·device·해상도를 실제 값으로 수정
 
 ## 완료 기준

@@ -8,7 +8,7 @@
 
 | 리포 | 로컬 경로 | 내용 |
 |---|---|---|
-| `Hail-mary-Camera` | `D:\orca_jetson\Jetson` | 엣지(Jetson) 코드 — `Hail_Mary/edge/`, `Hail_Mary/vision/`, 기획 문서(`문서/`, 로컬 전용) |
+| `Hail-mary-Camera` | `D:\orca_jetson\Jetson` | 엣지(Jetson) 코드 — `Hail_Mary/edge/`, `Hail_Mary/Camera/`(카메라 캡처+`Camera/AI/`(YOLOv8)), `Hail_Mary/vision/`(preview 등), 기획 문서(`문서/`, 로컬 전용) |
 | `Hail-mary-Server` | `D:\orca_jetson\Hail-mary-Server` | 백엔드(FastAPI) — `Hail_Mary/server/`. **`dashboard/`는 Front 리포로 이전, 이 리포에서는 삭제됨(2026-09-10)** |
 | `Hail-mary-Front` | `D:\orca_jetson\Hail-mary-Front` | **신설(2026-09-10)** — M11 대시보드(순수 HTML/CSS/JS). Server의 `Hail_Mary/dashboard/`를 이전+전면 재설계 |
 

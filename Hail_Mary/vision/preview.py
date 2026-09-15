@@ -10,8 +10,8 @@ import time
 
 import cv2
 
-from Hail_Mary.edge.capture import open_source, stream_frames
-from Hail_Mary.vision.detect import DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
+from Hail_Mary.Camera.AI.detect import DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
+from Hail_Mary.Camera.capture import open_source, stream_frames
 
 WINDOW_NAME = "Hail-Mary YOLOv8n preview"
 

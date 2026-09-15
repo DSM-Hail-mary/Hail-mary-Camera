@@ -18,16 +18,16 @@ from typing import Any
 
 import cv2
 
-from Hail_Mary.edge import capture as capture_module
+from Hail_Mary.Camera import capture as capture_module
+from Hail_Mary.Camera.AI.detect import DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
+from Hail_Mary.Camera.capture import stream_frames
 from Hail_Mary.edge.aggregator import aggregate_window
 from Hail_Mary.edge.buffer import LocalBuffer
 from Hail_Mary.edge.calibrate import load_polygon
-from Hail_Mary.edge.capture import stream_frames
 from Hail_Mary.edge.last_seen import LastSeenTracker, save_last_seen_locally
 from Hail_Mary.edge.last_seen_uplink import upload_last_seen_image
 from Hail_Mary.edge.uplink import Uplink
 from Hail_Mary.edge.zones import Point, count_people_in_zone
-from Hail_Mary.vision.detect import DEFAULT_IOU, DEFAULT_MIN_CONF, boxes_from_result, extract_person_detections, load_model
 
 DEFAULT_ZONE_ID = "hall_main"
 DEFAULT_ZONE_POLYGON: list[Point] = [(0, 0), (640, 0), (640, 384), (0, 384)]

@@ -35,7 +35,7 @@ def load_polygon(path: str | Path) -> tuple[str, list[Point]]:
 def main(zone_id: str = "hall_main", out_path: str | Path = "zone.json", camera_source: int | str = 0) -> None:  # pragma: no cover
     import cv2
 
-    from Hail_Mary.edge.capture import open_source, stream_frames
+    from Hail_Mary.Camera.capture import open_source, stream_frames
 
     # mouse-event coords are ints (cv2.circle/line require Sequence[int]); the
     # broader Point (float,float) alias is used for the saved-polygon contract.

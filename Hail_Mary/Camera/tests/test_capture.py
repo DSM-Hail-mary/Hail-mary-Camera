@@ -3,7 +3,7 @@ import argparse
 import cv2
 import numpy as np
 
-from Hail_Mary.edge import capture
+from Hail_Mary.Camera import capture
 
 
 def _write_real_video(path, frame_count=5, width=64, height=48, fps=10):

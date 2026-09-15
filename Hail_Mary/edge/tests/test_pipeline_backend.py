@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from Hail_Mary.edge import capture as capture_module
+from Hail_Mary.Camera import capture as capture_module
 from Hail_Mary.edge.pipeline import build_capture_args
 
 
