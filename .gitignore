@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# 가상환경
+.venv/
+venv/
+polewatch-env/
+.env
+
+# 모델/데이터 (대용량)
+*.engine
+*.onnx
+models/
+data/
+
+# 캡처 샘플
+capture_sample.jpg
+
+# OMC 세션 상태 (도구 산출물)
+.omc/
