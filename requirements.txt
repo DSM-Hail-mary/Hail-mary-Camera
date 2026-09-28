@@ -1,0 +1,7 @@
+# Jetson 엣지 의존성
+opencv-python        # 카메라 캡처 (camera.py)
+numpy
+pyserial             # GPS(NMEA) 수신
+pynmea2
+websocket-client     # 서버 WebSocket 텔레메트리 (telemetry_client.py)
+# jetson-stats       # (선택) 전력/온도 모니터링 jtop
