@@ -14,7 +14,8 @@ pip install -r requirements.txt
 | `camera.py` | USB 카메라 캡처 (스레드 · 바운드 큐 · 드롭 카운터) |
 | `gps.py` | USB GPS(u-blox) NMEA 수신 (pyserial+pynmea2, 백그라운드 스레드) |
 | `metrics.py` | 실제 기기 지표 수집 (온도=thermal zone / 전력=jtop·sysfs / fps·drop=카메라 실측 / gps) |
-| `telemetry_client.py` | 서버로 실시간 telemetry 전송 (WebSocket, 재연결·오프라인 버퍼) |
+| `telemetry_client.py` | 서버로 실시간 전송 (WebSocket, 재연결·오프라인 버퍼) — 기기 telemetry + 전주 `detection` |
+| `best_frame.py` | 전주당 여러 크롭 중 가장 선명한(흔들림 적은) 한 장 선택 (Laplacian variance) |
 
 ## 통합 실행 (pipeline.py)
 ```bash
@@ -32,6 +33,21 @@ python pipeline.py --no-camera --no-gps --interval 1 --duration 5
 python metrics.py                       # 온도·전력·스냅샷 확인
 python gps.py --port /dev/ttyACM0 --seconds 5   # GPS 수신 확인
 ```
+
+## 전주 판정 결과 전송 (사진)
+
+온디바이스 판정(위험/주의/양호)이 나오면, 전주당 여러 크롭 중 **가장 선명한 한 장**을
+골라 서버로 실시간 전송한다. (영상 미전송 원칙 유지 · best-frame으로 흔들림 최소화)
+
+```python
+from telemetry_client import TelemetryClient
+from best_frame import select_best, encode_jpeg
+
+best, _ = select_best(pole_crops)       # 여러 크롭 중 최선명
+tc.detection(grade="danger", hazard_type="nest", conf=0.9,
+             lat=lat, lon=lon, image_bytes=encode_jpeg(best))
+```
+파이프라인에서는 `emit_detection(tc, gps, grade, hazard_type, conf, crops)` 헬퍼로 한 번에 처리.
 
 ## 텔레메트리 클라이언트
 
