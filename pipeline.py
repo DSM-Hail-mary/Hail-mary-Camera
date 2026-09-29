@@ -46,6 +46,20 @@ class _Agg:
         return s
 
 
+def emit_detection(tc, gps, grade, hazard_type, conf, crops, pole_no=None):
+    """비전 판정 결과를 best-frame 사진과 함께 서버로 실시간 전송.
+    crops: 전주당 확보된 크롭 이미지 리스트 → 가장 선명한 한 장을 골라 보냄.
+    grade: danger|caution|safe (위험/주의/양호)."""
+    from best_frame import select_best, encode_jpeg
+    best, _ = select_best(crops or [])
+    img = encode_jpeg(best) if best is not None else None
+    fix = gps.read() if gps is not None else {}
+    tc.detection(grade=grade, hazard_type=hazard_type, conf=conf,
+                 lat=fix.get("lat"), lon=fix.get("lon"), image_bytes=img,
+                 pole_no=pole_no,
+                 recorded_at=datetime.now().isoformat(timespec="seconds"))
+
+
 def _open_jtop():
     """jetson-stats(jtop) 세션 — 정확한 전력 측정용. 없으면 None."""
     try:
@@ -88,7 +102,10 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
             # 카메라 프레임 소비 (fps/drop 통계 갱신 + 추후 추론 입력)
             if cam is not None:
                 frame = cam.read(timeout=1.0)
-                # TODO(vision): stage1(전주)→stage2(까치집/수목) 추론 → 전주 데이터(별도 채널)
+                # TODO(vision): stage1(전주)→stage2(까치집/수목) 추론 → 등급 판정.
+                # 전주 판정이 확정되면 best-frame 사진과 함께 실시간 전송:
+                #   emit_detection(tc, gps, grade="danger", hazard_type="nest",
+                #                  conf=0.9, crops=pole_crops, pole_no=pole_no)
                 _ = frame
             else:
                 time.sleep(0.05)
