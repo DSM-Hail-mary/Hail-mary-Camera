@@ -14,6 +14,7 @@ telemetry_client.py — Jetson → 서버 WebSocket 텔레메트리 클라이언
 """
 from __future__ import annotations
 
+import base64
 import json
 import threading
 import time
@@ -64,6 +65,20 @@ class TelemetryClient:
 
     def session_end(self, **summary) -> None:
         self._enqueue({"type": "session_end", **summary})
+
+    def detection(self, grade: str, hazard_type: Optional[str] = None,
+                  conf: Optional[float] = None, lat=None, lon=None,
+                  image_bytes: Optional[bytes] = None, pole_no: Optional[str] = None,
+                  recorded_at: Optional[str] = None) -> None:
+        """온디바이스 판정 결과 1건을 실시간 전송.
+        grade: danger|caution|safe (위험/주의/양호).
+        image_bytes: best-frame 크롭(JPEG 바이트) — base64로 실려 감."""
+        msg = {"type": "detection", "grade": grade, "hazard_type": hazard_type,
+               "conf": conf, "lat": lat, "lon": lon, "pole_no": pole_no,
+               "recorded_at": recorded_at}
+        if image_bytes is not None:
+            msg["image_b64"] = base64.b64encode(image_bytes).decode("ascii")
+        self._enqueue(msg)
 
     @property
     def connected(self) -> bool:
