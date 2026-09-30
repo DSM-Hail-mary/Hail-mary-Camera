@@ -16,6 +16,7 @@ pip install -r requirements.txt
 | `metrics.py` | 실제 기기 지표 수집 (온도=thermal zone / 전력=jtop·sysfs / fps·drop=카메라 실측 / gps) |
 | `telemetry_client.py` | 서버로 실시간 전송 (WebSocket, 재연결·오프라인 버퍼) — 기기 telemetry + 전주 `detection` |
 | `best_frame.py` | 전주당 여러 크롭 중 가장 선명한(흔들림 적은) 한 장 선택 (Laplacian variance) |
+| `gst_bridge.py` | 캡처 BGR 프레임을 TCP(127.0.0.1:5000)로 세현 C++ GStreamer 파이프라인에 전송 (rawvideoparse BGR 1280×720) |
 
 ## 통합 실행 (pipeline.py)
 ```bash
