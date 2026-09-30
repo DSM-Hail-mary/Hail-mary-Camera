@@ -72,7 +72,8 @@ def _open_jtop():
 
 
 def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson Nano",
-        gps_port: str = "/dev/ttyACM0", no_camera: bool = False, no_gps: bool = False):
+        gps_port: str = "/dev/ttyACM0", no_camera: bool = False, no_gps: bool = False,
+        gst_host: str = "127.0.0.1", gst_port: int = 5000):
     # 하드웨어 모듈은 필요할 때만 import (cv2/serial 없는 환경에서 --no-* 실행 가능)
     from metrics import MetricsCollector
     from telemetry_client import TelemetryClient
@@ -81,6 +82,11 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
     if not no_camera:
         from camera import Camera
         cam = Camera().start()
+    # 세현 GStreamer로 프레임을 흘려보낼 TCP 브리지 (camera 있을 때만)
+    bridge = None
+    if cam is not None:
+        from gst_bridge import GstBridge
+        bridge = GstBridge(gst_host, gst_port, width=cam.cfg.width, height=cam.cfg.height)
     gps = None
     if not no_gps:
         from gps import GPS
@@ -102,10 +108,12 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
             # 카메라 프레임 소비 (fps/drop 통계 갱신 + 추후 추론 입력)
             if cam is not None:
                 frame = cam.read(timeout=1.0)
-                # TODO(vision): stage1(전주)→stage2(까치집/수목) 추론 → 등급 판정.
-                # 전주 판정이 확정되면 best-frame 사진과 함께 실시간 전송:
-                #   emit_detection(tc, gps, grade="danger", hazard_type="nest",
-                #                  conf=0.9, crops=pole_crops, pole_no=pole_no)
+                # 세현 GStreamer(추론)로 프레임 전송 (TCP loopback)
+                if frame is not None and bridge is not None:
+                    bridge.send(frame.image)
+                # TODO(vision): 세현이 판정한 등급(danger/caution/safe)을 넘겨받으면
+                #   best-frame 사진과 함께 서버로 전송:
+                #   emit_detection(tc, gps, grade=..., hazard_type=..., conf=..., crops=...)
                 _ = frame
             else:
                 time.sleep(0.05)
@@ -131,6 +139,8 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
                        duration_sec=int((end_dt - start_dt).total_seconds()), **summary)
         print(f"[pipeline] 세션 종료 · 요약={summary}")
         tc.stop()
+        if bridge is not None:
+            bridge.close()
         if cam is not None:
             cam.stop()
         if gps is not None:
