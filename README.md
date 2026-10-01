@@ -13,6 +13,7 @@ pip install -r requirements.txt
 | `pipeline.py` | **통합 오케스트레이터**: 카메라+지표+GPS+서버전송 (session_start→telemetry→session_end) |
 | `camera.py` | USB 카메라 캡처 (스레드 · 바운드 큐 · 드롭 카운터) |
 | `gps.py` | USB GPS(u-blox) NMEA 수신 (pyserial+pynmea2, 백그라운드 스레드) |
+| `phone_gps.py` | 폰 GPS를 네트워크(NMEA over TCP/UDP)로 수신 — USB 테더링(방법 B). gps.py와 동일 인터페이스 |
 | `metrics.py` | 실제 기기 지표 수집 (온도=thermal zone / 전력=jtop·sysfs / fps·drop=카메라 실측 / gps) |
 | `telemetry_client.py` | 서버로 실시간 전송 (WebSocket, 재연결·오프라인 버퍼) — 기기 telemetry + 전주 `detection` |
 | `best_frame.py` | 전주당 여러 크롭 중 가장 선명한(흔들림 적은) 한 장 선택 (Laplacian variance) |
@@ -32,8 +33,18 @@ python pipeline.py --no-camera --no-gps --interval 1 --duration 5
 ### 개별 점검
 ```bash
 python metrics.py                       # 온도·전력·스냅샷 확인
-python gps.py --port /dev/ttyACM0 --seconds 5   # GPS 수신 확인
+python gps.py --port /dev/ttyACM0 --seconds 5           # 시리얼 GPS
+python phone_gps.py --host 192.168.42.129 --port 11123  # 폰 GPS(NMEA over TCP)
 ```
+
+## 폰 GPS (방법 B: USB 테더링)
+폰을 USB로 테더링하고, GPS 공유 앱(GPS2IP / Share GPS 등)이 **NMEA를 TCP로 송출**하게 설정한 뒤:
+```bash
+python pipeline.py --url ws://<서버>:8000/ws/device \
+  --gps-source phone --phone-host <폰_테더_IP> --phone-port 11123 --phone-proto tcp
+```
+- 폰 GPS는 좌표 + **시각(UTC) + 진행방향**까지 제공 → 판정 기록의 timestamp를 GPS 시각(KST 변환)으로 사용.
+- `gps.py`(시리얼)와 동일 인터페이스라 `--gps-source serial`로 언제든 전환 가능.
 
 ## 전주 판정 결과 전송 (사진)
 

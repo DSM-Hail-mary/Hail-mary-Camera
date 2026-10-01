@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+KST = timezone(timedelta(hours=9))
 
 
 class _Agg:
@@ -54,10 +56,18 @@ def emit_detection(tc, gps, grade, hazard_type, conf, crops, pole_no=None):
     best, _ = select_best(crops or [])
     img = encode_jpeg(best) if best is not None else None
     fix = gps.read() if gps is not None else {}
+    # 기록 시각: GPS 시각(UTC) 있으면 KST로 변환해 사용(정확), 없으면 보드 시계
+    utc = fix.get("utc")
+    if utc:
+        try:
+            recorded_at = datetime.fromisoformat(utc).astimezone(KST).isoformat(timespec="seconds")
+        except Exception:
+            recorded_at = datetime.now(KST).isoformat(timespec="seconds")
+    else:
+        recorded_at = datetime.now(KST).isoformat(timespec="seconds")
     tc.detection(grade=grade, hazard_type=hazard_type, conf=conf,
                  lat=fix.get("lat"), lon=fix.get("lon"), image_bytes=img,
-                 pole_no=pole_no,
-                 recorded_at=datetime.now().isoformat(timespec="seconds"))
+                 pole_no=pole_no, recorded_at=recorded_at)
 
 
 def _open_jtop():
@@ -73,7 +83,9 @@ def _open_jtop():
 
 def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson Nano",
         gps_port: str = "/dev/ttyACM0", no_camera: bool = False, no_gps: bool = False,
-        gst_host: str = "127.0.0.1", gst_port: int = 5000):
+        gst_host: str = "127.0.0.1", gst_port: int = 5000,
+        gps_source: str = "serial", phone_host: str = "192.168.42.129",
+        phone_port: int = 11123, phone_proto: str = "tcp"):
     # 하드웨어 모듈은 필요할 때만 import (cv2/serial 없는 환경에서 --no-* 실행 가능)
     from metrics import MetricsCollector
     from telemetry_client import TelemetryClient
@@ -89,8 +101,12 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
         bridge = GstBridge(gst_host, gst_port, width=cam.cfg.width, height=cam.cfg.height)
     gps = None
     if not no_gps:
-        from gps import GPS
-        gps = GPS(port=gps_port).start()
+        if gps_source == "phone":
+            from phone_gps import PhoneGPS
+            gps = PhoneGPS(phone_host, phone_port, phone_proto).start()
+        else:
+            from gps import GPS
+            gps = GPS(port=gps_port).start()
     jt = _open_jtop()
 
     collector = MetricsCollector(cam, gps, jt)
@@ -160,6 +176,16 @@ if __name__ == "__main__":
     ap.add_argument("--gps-port", default="/dev/ttyACM0")
     ap.add_argument("--no-camera", action="store_true", help="카메라 없이 실행")
     ap.add_argument("--no-gps", action="store_true", help="GPS 없이 실행")
+    ap.add_argument("--gst-host", default="127.0.0.1", help="세현 GStreamer TCP 호스트")
+    ap.add_argument("--gst-port", type=int, default=5000, help="세현 GStreamer TCP 포트")
+    ap.add_argument("--gps-source", default="serial", choices=["serial", "phone"],
+                    help="GPS 소스: serial(모듈) | phone(폰 NMEA, USB 테더)")
+    ap.add_argument("--phone-host", default="192.168.42.129", help="폰 테더 IP")
+    ap.add_argument("--phone-port", type=int, default=11123)
+    ap.add_argument("--phone-proto", default="tcp", choices=["tcp", "udp"])
     a = ap.parse_args()
     run(a.url, a.interval, a.duration, gps_port=a.gps_port,
-        no_camera=a.no_camera, no_gps=a.no_gps)
+        no_camera=a.no_camera, no_gps=a.no_gps,
+        gst_host=a.gst_host, gst_port=a.gst_port,
+        gps_source=a.gps_source, phone_host=a.phone_host,
+        phone_port=a.phone_port, phone_proto=a.phone_proto)
