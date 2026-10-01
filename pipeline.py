@@ -83,7 +83,9 @@ def _open_jtop():
 
 def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson Nano",
         gps_port: str = "/dev/ttyACM0", no_camera: bool = False, no_gps: bool = False,
-        gst_host: str = "127.0.0.1", gst_port: int = 5000,
+        gst_host: str = "127.0.0.1", gst_port: int = 5000, gst_bridge: bool = False,
+        engine: str = "/home/jetson_dsm/polewatch/models/best.engine",
+        conf: float = 0.25, no_detect: bool = False,
         gps_source: str = "serial", phone_host: str = "192.168.42.129",
         phone_port: int = 11123, phone_proto: str = "tcp"):
     # 하드웨어 모듈은 필요할 때만 import (cv2/serial 없는 환경에서 --no-* 실행 가능)
@@ -94,9 +96,15 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
     if not no_camera:
         from camera import Camera
         cam = Camera().start()
-    # 세현 GStreamer로 프레임을 흘려보낼 TCP 브리지 (camera 있을 때만)
+    # 온디바이스 탐지+판정 (풀-파이썬). best.pt→export한 best.engine 필요.
+    detector = judge = crop_bbox = None
+    if cam is not None and not no_detect:
+        from detector import Detector, crop_bbox as _crop
+        from judge import Judge
+        detector, judge, crop_bbox = Detector(engine, conf=conf), Judge(), _crop
+    # (옵션) 세현 GStreamer로 프레임을 흘려보낼 TCP 브리지 — 이제 탐지는 우리가 하므로 기본 off
     bridge = None
-    if cam is not None:
+    if cam is not None and gst_bridge:
         from gst_bridge import GstBridge
         bridge = GstBridge(gst_host, gst_port, width=cam.cfg.width, height=cam.cfg.height)
     gps = None
@@ -115,22 +123,30 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
     start_dt = datetime.now()
     tc.session_start(device, start_dt.strftime("%Y-%m-%d"), start_dt.strftime("%H:%M"))
     print(f"[pipeline] 세션 시작 {start_dt:%Y-%m-%d %H:%M} · interval={interval}s · "
-          f"camera={'on' if cam else 'off'} gps={'on' if gps else 'off'} jtop={'on' if jt else 'off'}")
+          f"camera={'on' if cam else 'off'} detect={'on' if detector else 'off'} "
+          f"gps={'on' if gps else 'off'} jtop={'on' if jt else 'off'}")
 
     agg = _Agg()
     last_tele = 0.0
     try:
         while True:
-            # 카메라 프레임 소비 (fps/drop 통계 갱신 + 추후 추론 입력)
+            # 카메라 프레임 소비 (fps/drop 통계 갱신 + 온디바이스 추론 입력)
             if cam is not None:
                 frame = cam.read(timeout=1.0)
-                # 세현 GStreamer(추론)로 프레임 전송 (TCP loopback)
-                if frame is not None and bridge is not None:
-                    bridge.send(frame.image)
-                # TODO(vision): 세현이 판정한 등급(danger/caution/safe)을 넘겨받으면
-                #   best-frame 사진과 함께 서버로 전송:
-                #   emit_detection(tc, gps, grade=..., hazard_type=..., conf=..., crops=...)
-                _ = frame
+                if frame is not None:
+                    # (옵션) 세현 GStreamer로 프레임 전송
+                    if bridge is not None:
+                        bridge.send(frame.image)
+                    # 온디바이스 탐지 → 판정 → 전송
+                    if detector is not None:
+                        result = judge.update(detector.infer(frame.image))
+                        if result is not None and result.emit:
+                            crop = crop_bbox(frame.image, result.bbox)
+                            emit_detection(tc, gps, grade=result.grade,
+                                           hazard_type=result.hazard_type,
+                                           conf=result.conf, crops=[crop])
+                            print(f"[pipeline] 판정 전송: {result.grade} "
+                                  f"{result.hazard_type} conf={result.conf}")
             else:
                 time.sleep(0.05)
 
@@ -176,6 +192,12 @@ if __name__ == "__main__":
     ap.add_argument("--gps-port", default="/dev/ttyACM0")
     ap.add_argument("--no-camera", action="store_true", help="카메라 없이 실행")
     ap.add_argument("--no-gps", action="store_true", help="GPS 없이 실행")
+    ap.add_argument("--engine", default="/home/jetson_dsm/polewatch/models/best.engine",
+                    help="탐지 TensorRT 엔진 (best.pt→export)")
+    ap.add_argument("--conf", type=float, default=0.25, help="탐지 신뢰도 임계값")
+    ap.add_argument("--no-detect", action="store_true", help="온디바이스 탐지/판정 끔")
+    ap.add_argument("--gst-bridge", action="store_true",
+                    help="(옵션) 세현 GStreamer로 프레임 TCP 전송 켬")
     ap.add_argument("--gst-host", default="127.0.0.1", help="세현 GStreamer TCP 호스트")
     ap.add_argument("--gst-port", type=int, default=5000, help="세현 GStreamer TCP 포트")
     ap.add_argument("--gps-source", default="serial", choices=["serial", "phone"],
@@ -186,6 +208,7 @@ if __name__ == "__main__":
     a = ap.parse_args()
     run(a.url, a.interval, a.duration, gps_port=a.gps_port,
         no_camera=a.no_camera, no_gps=a.no_gps,
-        gst_host=a.gst_host, gst_port=a.gst_port,
+        engine=a.engine, conf=a.conf, no_detect=a.no_detect,
+        gst_bridge=a.gst_bridge, gst_host=a.gst_host, gst_port=a.gst_port,
         gps_source=a.gps_source, phone_host=a.phone_host,
         phone_port=a.phone_port, phone_proto=a.phone_proto)
