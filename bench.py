@@ -83,13 +83,14 @@ def main():
     ap.add_argument("--width", type=int, default=640)
     ap.add_argument("--height", type=int, default=480)
     ap.add_argument("--fps", type=int, default=30)
+    ap.add_argument("--format", default="MJPG", choices=["MJPG", "YUYV"])
     ap.add_argument("--frames", type=int, default=100)
     ap.add_argument("--warmup", type=int, default=15)
     a = ap.parse_args()
 
     # 카메라
     cap = cv2.VideoCapture(a.device, cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*a.format))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, a.width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, a.height)
     cap.set(cv2.CAP_PROP_FPS, a.fps)
@@ -143,7 +144,7 @@ def main():
     print(f"""
 [Baseline]
 
-Camera       : {a.width}x{a.height} @ {a.fps} FPS
+Camera       : {a.width}x{a.height} @ {a.fps} FPS ({a.format})
 Model        : YOLOv8n
 TensorRT     : FP16
 
