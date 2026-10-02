@@ -17,7 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-HAZARD_CLASS = "crow_house"   # 까치집. (수목 미판정)
+HAZARD_CLASS = "crow_house"   # 모델 탐지 클래스명 (까치집). (수목 미판정)
+HAZARD_KIND = "nest"          # 서버/프론트 contract enum (nest|tree). 까치집=nest
 
 
 @dataclass
@@ -79,5 +80,5 @@ class Judge:
         if emit:
             self._cooldown = self.cooldown_frames
 
-        return Judgement(grade=grade, hazard_type="까치집", conf=round(top.conf, 3),
+        return Judgement(grade=grade, hazard_type=HAZARD_KIND, conf=round(top.conf, 3),
                          bbox=top.xyxy, emit=emit)
