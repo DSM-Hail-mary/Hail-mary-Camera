@@ -26,10 +26,13 @@ import websocket  # websocket-client
 
 class TelemetryClient:
     def __init__(self, url: str = "ws://127.0.0.1:8000/ws/device",
-                 reconnect_sec: float = 2.0, timeout: float = 3.0):
+                 reconnect_sec: float = 2.0, timeout: float = 3.0,
+                 max_buffer: int = 5000):
         self.url = url
         self.reconnect_sec = reconnect_sec
         self.timeout = timeout
+        self.max_buffer = max_buffer           # 오프라인 버퍼 상한(메모리 폭주 방지)
+        self._dropped_tele = 0                 # 상한 초과로 버린 telemetry 수
         self._buf: deque = deque()             # 미전송 메시지 버퍼(오프라인 대비)
         self._lock = threading.Lock()
         self._wake = threading.Event()         # 새 메시지 신호
@@ -92,6 +95,15 @@ class TelemetryClient:
     def _enqueue(self, msg: dict) -> None:
         with self._lock:
             self._buf.append(msg)
+            # 상한 초과 시: 오래된 telemetry만 버리고 session/detection은 보존(유실 방지)
+            if len(self._buf) > self.max_buffer:
+                for i, m in enumerate(self._buf):
+                    if m.get("type") == "telemetry":
+                        del self._buf[i]
+                        self._dropped_tele += 1
+                        break
+                else:
+                    self._buf.popleft()   # telemetry가 없으면 가장 오래된 것 제거
         self._wake.set()
 
     def _run(self) -> None:

@@ -134,30 +134,39 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
             if cam is not None:
                 frame = cam.read(timeout=1.0)
                 if frame is not None:
-                    # (옵션) 세현 GStreamer로 프레임 전송
+                    # (옵션) 세현 GStreamer로 프레임 전송 — 브리지 끊김이 주행을 막지 않게
                     if bridge is not None:
-                        bridge.send(frame.image)
-                    # 온디바이스 탐지 → 판정 → 전송
+                        try:
+                            bridge.send(frame.image)
+                        except Exception as e:
+                            print(f"[pipeline] 브리지 전송 오류(무시): {e}")
+                    # 온디바이스 탐지 → 판정 → 전송 — 프레임 단위 예외 격리
                     if detector is not None:
-                        result = judge.update(detector.infer(frame.image))
-                        if result is not None and result.emit:
-                            crop = crop_bbox(frame.image, result.bbox)
-                            emit_detection(tc, gps, grade=result.grade,
-                                           hazard_type=result.hazard_type,
-                                           conf=result.conf, crops=[crop])
-                            print(f"[pipeline] 판정 전송: {result.grade} "
-                                  f"{result.hazard_type} conf={result.conf}")
+                        try:
+                            result = judge.update(detector.infer(frame.image))
+                            if result is not None and result.emit:
+                                crop = crop_bbox(frame.image, result.bbox)
+                                emit_detection(tc, gps, grade=result.grade,
+                                               hazard_type=result.hazard_type,
+                                               conf=result.conf, crops=[crop])
+                                print(f"[pipeline] 판정 전송: {result.grade} "
+                                      f"{result.hazard_type} conf={result.conf}")
+                        except Exception as e:
+                            print(f"[pipeline] 탐지/판정 오류(프레임 건너뜀): {e}")
             else:
                 time.sleep(0.05)
 
             now = time.time()
             if now - last_tele >= interval:
-                snap = collector.snapshot()
-                agg.update(snap)
-                t = datetime.now().strftime("%H:%M")
-                tc.telemetry(t, snap["temp"], snap["power"], snap["drops"], snap["gps"])
-                print(f"[pipeline] telemetry {t} · temp={snap['temp']} power={snap['power']} "
-                      f"fps={snap['fps']} drops={snap['drops']} gps={snap['gps']} · 대기={tc.pending()}")
+                try:
+                    snap = collector.snapshot()
+                    agg.update(snap)
+                    t = datetime.now().strftime("%H:%M")
+                    tc.telemetry(t, snap["temp"], snap["power"], snap["drops"], snap["gps"])
+                    print(f"[pipeline] telemetry {t} · temp={snap['temp']} power={snap['power']} "
+                          f"fps={snap['fps']} drops={snap['drops']} gps={snap['gps']} · 대기={tc.pending()}")
+                except Exception as e:
+                    print(f"[pipeline] telemetry 수집/전송 오류(계속): {e}")
                 last_tele = now
 
             if duration is not None and (time.time() - start_dt.timestamp()) >= duration:

@@ -32,6 +32,7 @@ class CameraConfig:
     fourcc: str = "MJPG"            # OV2311 UVC에서 30fps 나오는 포맷
     hw_decode: bool = True         # True=NVDEC(nvv4l2decoder) HW 디코드, False=V4L2 CPU
     queue_size: int = 8            # 소비자가 밀릴 때 버퍼링할 최대 프레임 수
+    reopen_after_fails: int = 30   # 연속 read 실패 N회 시 장치 재오픈 (USB 단절 복구)
     # v4l2 수동 노출 설정값 (STEP2에서 확인한 값). None이면 건드리지 않음
     manual_exposure: Optional[int] = 10        # ≈1/1000s
     auto_exposure_manual_val: int = 1          # 1 = Manual mode (드라이버 관례)
@@ -43,6 +44,7 @@ class CaptureStats:
     delivered: int = 0             # 큐에 성공적으로 넣은 프레임
     dropped: int = 0               # 큐가 꽉 차서 버린 프레임 (소비자가 밀림)
     read_fail: int = 0             # cap.read() 실패 횟수
+    reopens: int = 0               # 장치 단절 후 재오픈 성공 횟수
     started_at: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -143,14 +145,46 @@ class Camera:
         self._backend = "v4l2(CPU)"
         self._apply_manual_exposure()
 
+    def _reopen(self) -> None:
+        """장치 단절(USB 글리치 등) 복구: 닫고 backoff로 재오픈 재시도."""
+        print("[camera] 연속 read 실패 → 장치 재오픈 시도")
+        try:
+            if self._cap:
+                self._cap.release()
+        except Exception:
+            pass
+        backoff = 0.5
+        while self._running.is_set():
+            try:
+                self._open()
+                with self.stats._lock:
+                    self.stats.reopens += 1
+                print(f"[camera] 재오픈 성공 (총 {self.stats.reopens}회)")
+                return
+            except Exception as e:
+                print(f"[camera] 재오픈 실패, {backoff:.1f}s 후 재시도: {e}")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 5.0)
+
     # ---- 캡처 루프 (생산자 스레드) ----------------------------------------
     def _loop(self) -> None:
         seq = 0
+        consec_fail = 0
         while self._running.is_set():
-            ok, img = self._cap.read()
+            try:
+                ok, img = self._cap.read()
+            except Exception:
+                ok, img = False, None
             if not ok:
                 self.stats.read_fail += 1
+                consec_fail += 1
+                if consec_fail >= self.cfg.reopen_after_fails:
+                    self._reopen()           # 단절 복구 (성공 시 캡처 재개)
+                    consec_fail = 0
+                else:
+                    time.sleep(0.01)         # busy-spin 방지
                 continue
+            consec_fail = 0
 
             seq += 1
             with self.stats._lock:
