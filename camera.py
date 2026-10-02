@@ -30,6 +30,7 @@ class CameraConfig:
     height: int = 720
     fps: int = 30
     fourcc: str = "MJPG"            # OV2311 UVC에서 30fps 나오는 포맷
+    hw_decode: bool = True         # True=NVDEC(nvv4l2decoder) HW 디코드, False=V4L2 CPU
     queue_size: int = 8            # 소비자가 밀릴 때 버퍼링할 최대 프레임 수
     # v4l2 수동 노출 설정값 (STEP2에서 확인한 값). None이면 건드리지 않음
     manual_exposure: Optional[int] = 10        # ≈1/1000s
@@ -66,6 +67,7 @@ class Camera:
     def __init__(self, cfg: CameraConfig = CameraConfig()):
         self.cfg = cfg
         self.stats = CaptureStats()
+        self._backend = "unknown"
         self._cap: Optional[cv2.VideoCapture] = None
         self._queue: "Queue[Frame]" = Queue(maxsize=cfg.queue_size)
         self._thread: Optional[threading.Thread] = None
@@ -90,7 +92,35 @@ class Camera:
                 # 컨트롤명이 다를 수 있음 → 경고만, 캡처는 계속
                 print(f"[camera] 노출 설정 경고: {' '.join(c)} -> {e}")
 
+    def _gst_pipeline(self) -> str:
+        """MJPG → NVDEC(nvv4l2decoder) HW 디코드 → BGR appsink.
+        디코드가 GStreamer(C, GIL 밖) + NVDEC HW에서 일어나 CPU/파이썬 병목을 우회."""
+        c = self.cfg
+        return (
+            f"v4l2src device={c.device} io-mode=2 ! "
+            f"image/jpeg,width={c.width},height={c.height},framerate={c.fps}/1 ! "
+            f"nvv4l2decoder mjpeg=1 ! nvvidconv ! video/x-raw,format=BGRx ! "
+            f"videoconvert ! video/x-raw,format=BGR ! "
+            f"appsink drop=1 max-buffers=1 sync=false"
+        )
+
     def _open(self) -> None:
+        # HW 디코드(GStreamer/NVDEC) 우선, 실패 시 V4L2(CPU)로 자동 폴백
+        if self.cfg.hw_decode:
+            self._apply_manual_exposure()      # v4l2src가 장치를 잡기 전에 노출 설정
+            cap = cv2.VideoCapture(self._gst_pipeline(), cv2.CAP_GSTREAMER)
+            if cap.isOpened():
+                self._cap = cap
+                self._backend = "gstreamer(NVDEC)"
+                print(f"[camera] open {self.cfg.device}: "
+                      f"{self.cfg.width}x{self.cfg.height} @ {self.cfg.fps}fps "
+                      f"· HW디코드(nvv4l2decoder)")
+                return
+            cap.release()
+            print("[camera] GStreamer(HW) 열기 실패 → V4L2(CPU)로 폴백")
+        self._open_v4l2()
+
+    def _open_v4l2(self) -> None:
         cap = cv2.VideoCapture(self.cfg.device, cv2.CAP_V4L2)
         if not cap.isOpened():
             raise RuntimeError(f"카메라 열기 실패: {self.cfg.device}")
@@ -107,9 +137,10 @@ class Camera:
         ah = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         af = cap.get(cv2.CAP_PROP_FPS)
         print(f"[camera] open {self.cfg.device}: {aw}x{ah} @ {af:.0f}fps "
-              f"(요청 {self.cfg.width}x{self.cfg.height}@{self.cfg.fps})")
+              f"(요청 {self.cfg.width}x{self.cfg.height}@{self.cfg.fps}) · V4L2(CPU 디코드)")
 
         self._cap = cap
+        self._backend = "v4l2(CPU)"
         self._apply_manual_exposure()
 
     # ---- 캡처 루프 (생산자 스레드) ----------------------------------------
