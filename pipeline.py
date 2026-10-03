@@ -14,6 +14,8 @@ import argparse
 import time
 from datetime import datetime, timedelta, timezone
 
+import model_config   # 모델 교체 블럭(기본 엔진 경로)
+
 KST = timezone(timedelta(hours=9))
 
 
@@ -84,7 +86,7 @@ def _open_jtop():
 def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson Nano",
         gps_port: str = "/dev/ttyACM0", no_camera: bool = False, no_gps: bool = False,
         gst_host: str = "127.0.0.1", gst_port: int = 5000, gst_bridge: bool = False,
-        engine: str = "/home/jetson_dsm/polewatch/models/best.engine",
+        engine: str = model_config.ENGINE,
         conf: float = 0.25, no_detect: bool = False,
         gps_source: str = "serial", phone_host: str = "192.168.42.129",
         phone_port: int = 11123, phone_proto: str = "tcp"):
@@ -201,8 +203,8 @@ if __name__ == "__main__":
     ap.add_argument("--gps-port", default="/dev/ttyACM0")
     ap.add_argument("--no-camera", action="store_true", help="카메라 없이 실행")
     ap.add_argument("--no-gps", action="store_true", help="GPS 없이 실행")
-    ap.add_argument("--engine", default="/home/jetson_dsm/polewatch/models/best.engine",
-                    help="탐지 TensorRT 엔진 (best.pt→export)")
+    ap.add_argument("--engine", default=model_config.ENGINE,
+                    help="탐지 TensorRT 엔진 (기본값은 model_config.ENGINE)")
     ap.add_argument("--conf", type=float, default=0.25, help="탐지 신뢰도 임계값")
     ap.add_argument("--no-detect", action="store_true", help="온디바이스 탐지/판정 끔")
     ap.add_argument("--gst-bridge", action="store_true",

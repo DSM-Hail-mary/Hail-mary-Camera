@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+import model_config   # 모델 교체 블럭(엔진 경로/클래스 역할)
+
 
 @dataclass
 class Detection:
@@ -28,8 +30,9 @@ class Detection:
 
 
 class Detector:
-    def __init__(self, engine_path: str, conf: float = 0.25, iou: float = 0.45,
-                 imgsz: int = 640, names_override: Optional[dict] = None):
+    def __init__(self, engine_path: str = model_config.ENGINE, conf: float = 0.25,
+                 iou: float = 0.45, imgsz: int = model_config.IMGSZ,
+                 names_override: Optional[dict] = None):
         from ultralytics import YOLO
         self.model = YOLO(engine_path, task="detect")
         self.conf, self.iou, self.imgsz = conf, iou, imgsz
