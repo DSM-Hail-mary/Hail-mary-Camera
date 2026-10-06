@@ -37,11 +37,14 @@ class Judge:
     없으면 None을 돌려준다. 연속 검출 수 같은 상태는 내부에서 관리한다.
     """
 
-    def __init__(self, conf_danger: float = 0.60, conf_caution: float = 0.35,
+    def __init__(self, conf_danger: float = 0.25, conf_caution: float = 0.15,
                  min_consecutive: int = 3, cooldown_frames: int = 60):
-        # TODO(다연): 아래 임계값은 PR곡선/검증셋으로 보정할 것 (지금은 임시값)
-        self.conf_danger = conf_danger        # 이 이상이면 위험 후보
-        self.conf_caution = conf_caution      # 이 이상이면 주의 후보
+        # 임계값 근거(세현 학습 BoxF1/PR 곡선):
+        #   crow_house F1 피크 ~0.57 @ conf≈0.2 (all-classes F1-max @ 0.284), AP@0.5=0.545.
+        #   → 검출 운용점 conf≈0.25를 '위험'으로, 0.15~0.25 회색지대를 '주의'로 매핑.
+        #   ※ danger/caution 경계는 정책값 — 실제 까치집 검증셋 확보 시 재보정 권장.
+        self.conf_danger = conf_danger        # ≥ → 위험 (F1 운용점)
+        self.conf_caution = conf_caution      # ≥ → 주의 (회색지대)
         self.min_consecutive = min_consecutive  # 연속 N프레임 검출돼야 확정(깜빡임 억제)
         self.cooldown_frames = cooldown_frames  # 전송 후 N프레임은 재전송 안 함(중복 억제)
         self._streak = 0
@@ -62,9 +65,8 @@ class Judge:
         self._streak += 1
 
         # ──────────────────────────────────────────────────────────────
-        # TODO(다연): 실제 등급 규칙을 여기에 작성.
-        #   예시 신호: top.conf, top.area_ratio, self._streak, 연속 재방문 등
-        #   아래는 파이프라인 검증용 **임시** 규칙 (반드시 교체):
+        # 등급 규칙: conf 운용점 기반 (F1 곡선 근거, __init__ 주석 참고).
+        #   추후 top.area_ratio(크기)·self._streak(연속성) 결합으로 고도화 가능.
         if top.conf >= self.conf_danger:
             grade = "danger"
         elif top.conf >= self.conf_caution:
