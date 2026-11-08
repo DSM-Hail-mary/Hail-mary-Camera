@@ -38,7 +38,7 @@ class Judge:
     """
 
     def __init__(self, conf_danger: float = 0.25, conf_caution: float = 0.15,
-                 min_consecutive: int = 3, cooldown_frames: int = 60):
+                 min_consecutive: int = 3, clear_frames: int = 15):
         # 임계값 근거(세현 학습 BoxF1/PR 곡선):
         #   crow_house F1 피크 ~0.57 @ conf≈0.2 (all-classes F1-max @ 0.284), AP@0.5=0.545.
         #   → 검출 운용점 conf≈0.25를 '위험'으로, 0.15~0.25 회색지대를 '주의'로 매핑.
@@ -46,19 +46,21 @@ class Judge:
         self.conf_danger = conf_danger        # ≥ → 위험 (F1 운용점)
         self.conf_caution = conf_caution      # ≥ → 주의 (회색지대)
         self.min_consecutive = min_consecutive  # 연속 N프레임 검출돼야 확정(깜빡임 억제)
-        self.cooldown_frames = cooldown_frames  # 전송 후 N프레임은 재전송 안 함(중복 억제)
+        self.clear_frames = clear_frames      # 연속 N프레임 미검출이면 지나간 것으로 봄(통과 종료)
         self._streak = 0
-        self._cooldown = 0
+        self._miss = 0
+        self._sent = False                    # 이번 통과에서 이미 전송했는지 (통과당 1건)
 
     def update(self, detections) -> Optional[Judgement]:
-        if self._cooldown > 0:
-            self._cooldown -= 1
-
         # 1) 까치집 후보만 추림 (수목 미판정)
         houses = [d for d in detections if d.cls_name == HAZARD_CLASS]
         if not houses:
             self._streak = 0
+            self._miss += 1
+            if self._miss >= self.clear_frames:
+                self._sent = False            # 통과 종료 → 다음 등장은 새 건으로 전송
             return None
+        self._miss = 0
 
         # 2) 가장 신뢰도 높은 1건 기준 (전주당 대표 1건)
         top = max(houses, key=lambda d: d.conf)
@@ -75,12 +77,12 @@ class Judge:
             grade = "safe"
         # ──────────────────────────────────────────────────────────────
 
-        # 3) 전송 여부: 연속 검출 충족 + 쿨다운 아님 + 위험/주의일 때만
+        # 3) 전송 여부: 연속 검출 충족 + 이번 통과에서 미전송 + 위험/주의일 때만
         emit = (self._streak >= self.min_consecutive
-                and self._cooldown == 0
+                and not self._sent
                 and grade in ("danger", "caution"))
         if emit:
-            self._cooldown = self.cooldown_frames
+            self._sent = True
 
         return Judgement(grade=grade, hazard_type=HAZARD_KIND, conf=round(top.conf, 3),
                          bbox=top.xyxy, emit=emit)

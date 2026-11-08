@@ -32,6 +32,12 @@ HAZARD_KIND = {
     # "tree": "tree",
 }
 
+# 모델 클래스명 → 상세 화면 검출 박스 종류 (crops.detections.kind = nest|tree|pole)
+DETECTION_KIND = {
+    **HAZARD_KIND,
+    "pole": "pole",
+}
+
 
 def hazard_classes():
     """위험(hazard)으로 분류된 모델 클래스명 목록."""

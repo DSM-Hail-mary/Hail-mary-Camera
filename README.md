@@ -43,8 +43,8 @@ HailMary 시스템의 **차량 탑재 엣지**입니다. 카메라로 전주 상
 |---|---|
 | `pipeline.py` | **통합 오케스트레이터**: 카메라→탐지→판정→전송 + 기기 telemetry. 프레임단위 예외 격리 |
 | `camera.py` | USB 카메라 캡처 (스레드·바운드 큐·드롭 카운터). **NVDEC HW디코드**(실패 시 V4L2 CPU 폴백) + **USB 단절 자동 재오픈** |
-| `detector.py` | YOLOv8 TensorRT(ultralytics) 래퍼. 프레임→탐지결과(cls/conf/bbox/면적비) + bbox 크롭 |
-| `judge.py` | 위험 등급 판정 (까치집, danger/caution/safe). ⚠ 현재 임계값은 **임시 placeholder** — 담당자가 작성 |
+| `detector.py` | YOLOv8 TensorRT(ultralytics) 래퍼. 프레임→탐지결과(cls/conf/bbox/면적비) + bbox 크롭 + 크롭 기준 박스 변환(상세 화면 라벨링) |
+| `judge.py` | 위험 등급 판정 (까치집, danger/caution/safe). 까치집 1개를 지나가는 동안 **1건만 전송**(15프레임 연속 미검출 시 통과 종료). ⚠ 현재 임계값은 **임시 placeholder** — 담당자가 작성 |
 | `model_config.py` | **모델 교체 블럭**(단일 수정 지점): 엔진 경로 + 클래스 역할/hazard enum |
 | `telemetry_client.py` | 서버 WebSocket 전송. 재연결 + 오프라인 버퍼(유실 없음, 상한 초과 시 telemetry만 드롭) |
 | `metrics.py` | 실기기 지표: 온도(thermal zone)/전력(jtop·sysfs)/fps·drop(카메라 실측)/gps |
