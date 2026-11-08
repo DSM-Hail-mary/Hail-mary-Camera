@@ -50,10 +50,11 @@ class _Agg:
         return s
 
 
-def emit_detection(tc, gps, grade, hazard_type, conf, crops, pole_no=None):
+def emit_detection(tc, gps, grade, hazard_type, conf, crops, pole_no=None, detections=None):
     """비전 판정 결과를 best-frame 사진과 함께 서버로 실시간 전송.
     crops: 전주당 확보된 크롭 이미지 리스트 → 가장 선명한 한 장을 골라 보냄.
-    grade: danger|caution|safe (위험/주의/양호)."""
+    grade: danger|caution|safe (위험/주의/양호).
+    detections: 크롭 기준 검출 박스 (detector.boxes_in_crop). crops가 1장일 때 그 크롭 기준."""
     from best_frame import select_best, encode_jpeg
     best, _ = select_best(crops or [])
     img = encode_jpeg(best) if best is not None else None
@@ -69,7 +70,7 @@ def emit_detection(tc, gps, grade, hazard_type, conf, crops, pole_no=None):
         recorded_at = datetime.now(KST).isoformat(timespec="seconds")
     tc.detection(grade=grade, hazard_type=hazard_type, conf=conf,
                  lat=fix.get("lat"), lon=fix.get("lon"), image_bytes=img,
-                 pole_no=pole_no, recorded_at=recorded_at)
+                 pole_no=pole_no, recorded_at=recorded_at, detections=detections)
 
 
 def _open_jtop():
@@ -99,11 +100,11 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
         from camera import Camera
         cam = Camera().start()
     # 온디바이스 탐지+판정 (풀-파이썬). best.pt→export한 best.engine 필요.
-    detector = judge = crop_bbox = None
+    detector = judge = None
     if cam is not None and not no_detect:
-        from detector import Detector, crop_bbox as _crop
+        from detector import Detector, crop_region, boxes_in_crop
         from judge import Judge
-        detector, judge, crop_bbox = Detector(engine, conf=conf), Judge(), _crop
+        detector, judge = Detector(engine, conf=conf), Judge()
     # (옵션) 세현 GStreamer로 프레임을 흘려보낼 TCP 브리지 — 이제 탐지는 우리가 하므로 기본 off
     bridge = None
     if cam is not None and gst_bridge:
@@ -145,12 +146,16 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
                     # 온디바이스 탐지 → 판정 → 전송 — 프레임 단위 예외 격리
                     if detector is not None:
                         try:
-                            result = judge.update(detector.infer(frame.image))
+                            dets = detector.infer(frame.image)
+                            result = judge.update(dets)
                             if result is not None and result.emit:
-                                crop = crop_bbox(frame.image, result.bbox)
+                                # 크롭 + 크롭 기준 박스(까치집·전주) → 상세 화면에 라벨링 표시
+                                x1, y1, x2, y2 = region = crop_region(frame.image, result.bbox)
+                                crop = frame.image[y1:y2, x1:x2].copy()
                                 emit_detection(tc, gps, grade=result.grade,
                                                hazard_type=result.hazard_type,
-                                               conf=result.conf, crops=[crop])
+                                               conf=result.conf, crops=[crop],
+                                               detections=boxes_in_crop(dets, region))
                                 print(f"[pipeline] 판정 전송: {result.grade} "
                                       f"{result.hazard_type} conf={result.conf}")
                         except Exception as e:

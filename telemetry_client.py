@@ -72,13 +72,17 @@ class TelemetryClient:
     def detection(self, grade: str, hazard_type: Optional[str] = None,
                   conf: Optional[float] = None, lat=None, lon=None,
                   image_bytes: Optional[bytes] = None, pole_no: Optional[str] = None,
-                  recorded_at: Optional[str] = None) -> None:
+                  recorded_at: Optional[str] = None,
+                  detections: Optional[list] = None) -> None:
         """온디바이스 판정 결과 1건을 실시간 전송.
         grade: danger|caution|safe (위험/주의/양호).
-        image_bytes: best-frame 크롭(JPEG 바이트) — base64로 실려 감."""
+        image_bytes: best-frame 크롭(JPEG 바이트) — base64로 실려 감.
+        detections: 크롭 기준 0~1 검출 박스 [{kind, box:{x,y,w,h}, score}] (상세 화면 표시용)."""
         msg = {"type": "detection", "grade": grade, "hazard_type": hazard_type,
                "conf": conf, "lat": lat, "lon": lon, "pole_no": pole_no,
                "recorded_at": recorded_at}
+        if detections:
+            msg["detections"] = detections
         if image_bytes is not None:
             msg["image_b64"] = base64.b64encode(image_bytes).decode("ascii")
         self._enqueue(msg)
