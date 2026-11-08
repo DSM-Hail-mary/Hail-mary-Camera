@@ -1,7 +1,27 @@
-# PoleWatch 엣지 (edge) — Jetson Orin Nano
+<div align="center">
 
-차량 장착 카메라로 배전 전주 상단의 위험물(까치집)을 **온디바이스로 탐지·판정**하고,
-판정 결과(등급 + best-frame 사진)와 기기 상태를 서버로 실시간 전송하는 엣지 코드.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/DSM-Hail-mary/.github/main/profile/assets/hailmary-logo-dark.png">
+  <img src="https://raw.githubusercontent.com/DSM-Hail-mary/.github/main/profile/assets/hailmary-logo-light.png" alt="HailMary" width="280">
+</picture>
+
+# HailMary · Edge (Python)
+
+**Jetson에서 까치집을 탐지·판정하고 결과와 기기 상태를 서버로 보내는 엣지 코드**
+
+![Jetson](https://img.shields.io/badge/Jetson_Orin_Nano-76B900?style=flat-square&logo=nvidia&logoColor=white) ![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=flat-square&logo=python&logoColor=white) ![TensorRT](https://img.shields.io/badge/YOLOv8_·_TensorRT-111111?style=flat-square&logo=nvidia&logoColor=white)
+
+<sub>[HailMary 조직](https://github.com/DSM-Hail-mary) · [main](https://github.com/DSM-Hail-mary/Hail-mary-main) · [Camera](https://github.com/DSM-Hail-mary/Hail-mary-Camera) · [Server](https://github.com/DSM-Hail-mary/Hail-mary-Server) · [Front](https://github.com/DSM-Hail-mary/Hail-mary-Front)</sub>
+
+</div>
+
+---
+
+## 역할
+
+HailMary 시스템의 **차량 탑재 엣지**입니다. 카메라로 전주 상단을 촬영해 위험물(까치집)을 **온디바이스로 탐지·판정**하고,
+판정 결과(등급 + best-frame 사진 + GPS)와 기기 상태(온도·전력·프레임 드롭)를 [Server](https://github.com/DSM-Hail-mary/Hail-mary-Server)로 실시간 전송합니다.
+
 
 **풀-파이썬 파이프라인**(탐지·판정을 우리 쪽에서 수행):
 ```
@@ -38,7 +58,7 @@
 
 ## 설치
 ```bash
-python -m venv ~/polewatch-env && source ~/polewatch-env/bin/activate
+python -m venv ~/hailmary-env && source ~/hailmary-env/bin/activate
 pip install -r requirements.txt
 ```
 
