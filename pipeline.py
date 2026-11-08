@@ -90,7 +90,8 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
         engine: str = model_config.ENGINE,
         conf: float = 0.25, no_detect: bool = False,
         gps_source: str = "serial", phone_host: str = "192.168.42.129",
-        phone_port: int = 11123, phone_proto: str = "tcp"):
+        phone_port: int = 11123, phone_proto: str = "tcp",
+        show: bool = False, record=None):
     # 하드웨어 모듈은 필요할 때만 import (cv2/serial 없는 환경에서 --no-* 실행 가능)
     from metrics import MetricsCollector
     from telemetry_client import TelemetryClient
@@ -105,6 +106,10 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
         from detector import Detector, crop_region, boxes_in_crop
         from judge import Judge
         detector, judge = Detector(engine, conf=conf), Judge()
+    overlay = None
+    if detector is not None and (show or record):
+        from overlay import Overlay
+        overlay = Overlay(show, record, fps=cam.cfg.fps)
     # (옵션) 세현 GStreamer로 프레임을 흘려보낼 TCP 브리지 — 이제 탐지는 우리가 하므로 기본 off
     bridge = None
     if cam is not None and gst_bridge:
@@ -158,6 +163,10 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
                                                detections=boxes_in_crop(dets, region))
                                 print(f"[pipeline] 판정 전송: {result.grade} "
                                       f"{result.hazard_type} conf={result.conf}")
+                                if overlay is not None:
+                                    overlay.mark_sent(result.grade, result.conf)
+                            if overlay is not None:
+                                overlay.emit(overlay.draw(frame.image, dets, result))
                         except Exception as e:
                             print(f"[pipeline] 탐지/판정 오류(프레임 건너뜀): {e}")
             else:
@@ -187,6 +196,8 @@ def run(url: str, interval: float = 60.0, duration=None, device: str = "Jetson N
                        duration_sec=int((end_dt - start_dt).total_seconds()), **summary)
         print(f"[pipeline] 세션 종료 · 요약={summary}")
         tc.stop()
+        if overlay is not None:
+            overlay.close()
         if bridge is not None:
             bridge.close()
         if cam is not None:
@@ -221,10 +232,13 @@ if __name__ == "__main__":
     ap.add_argument("--phone-host", default="192.168.42.129", help="폰 테더 IP")
     ap.add_argument("--phone-port", type=int, default=11123)
     ap.add_argument("--phone-proto", default="tcp", choices=["tcp", "udp"])
+    ap.add_argument("--show", action="store_true", help="탐지 박스 화면 표시")
+    ap.add_argument("--record", default=None, help="탐지 박스 화면을 mp4로 저장")
     a = ap.parse_args()
     run(a.url, a.interval, a.duration, gps_port=a.gps_port,
         no_camera=a.no_camera, no_gps=a.no_gps,
         engine=a.engine, conf=a.conf, no_detect=a.no_detect,
         gst_bridge=a.gst_bridge, gst_host=a.gst_host, gst_port=a.gst_port,
         gps_source=a.gps_source, phone_host=a.phone_host,
-        phone_port=a.phone_port, phone_proto=a.phone_proto)
+        phone_port=a.phone_port, phone_proto=a.phone_proto,
+        show=a.show, record=a.record)

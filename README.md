@@ -48,6 +48,7 @@ HailMary 시스템의 **차량 탑재 엣지**입니다. 카메라로 전주 상
 | `model_config.py` | **모델 교체 블럭**(단일 수정 지점): 엔진 경로 + 클래스 역할/hazard enum |
 | `telemetry_client.py` | 서버 WebSocket 전송. 재연결 + 오프라인 버퍼(유실 없음, 상한 초과 시 telemetry만 드롭) |
 | `metrics.py` | 실기기 지표: 온도(thermal zone)/전력(jtop·sysfs)/fps·drop(카메라 실측)/gps |
+| `overlay.py` | 시연·촬영용 탐지 박스 표시(`--show`)·녹화(`--record`). 서버 전송 사진에는 영향 없음 |
 | `best_frame.py` | 크롭 중 가장 선명한 한 장 선택(Laplacian variance) + JPEG 인코딩 |
 | `gps.py` / `phone_gps.py` | NMEA 수신 — 시리얼(u-blox) / 네트워크(폰, TCP·UDP). 동일 인터페이스, 재연결 내장 |
 | `gst_bridge.py` | (옵션) 캡처 BGR을 TCP로 세현 C++ GStreamer에 전송 — 이제 `--gst-bridge`로 opt-in |
@@ -79,6 +80,7 @@ python pipeline.py --url ws://<서버IP>:8000/ws/device --gps-source phone --int
 python pipeline.py --no-camera --no-gps --interval 1 --duration 5
 ```
 주요 플래그: `--engine`(기본 model_config) · `--conf` · `--no-detect` · `--gst-bridge`(세현 전송 켬)
+· `--show`(탐지 박스 화면) · `--record out.mp4`(탐지 박스 화면 녹화)
 · `--gps-source serial|phone` · `--phone-host/--phone-port/--phone-proto`
 
 ## 모델 교체 (블럭 방식)
